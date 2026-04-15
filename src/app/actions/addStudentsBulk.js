@@ -17,18 +17,21 @@ export async function addStudentsBulk(studentsArray) {
 
         // Map specific Excel keys safely to our Postgres Student keys
         const payload = studentsArray.map(s => ({
-            student_id: s.Student_ID || s['Student ID'] || s.student_id,
+            student_id: String(s.Student_ID || s['Student ID'] || s.student_id || s['UT Number'] || ''),
             name: s.Name || s.name,
             course: s.Course || s.course,
             batch: String(s.Batch || s.batch || new Date().getFullYear()),
-            photo_url: s.Photo_URL || s.photo_url || ""
+            group_name: s.Group || s.group_name || s.group || "",
+            photo_url: s.Photo_URL || s.photo_url || s.image || ""
         }));
 
         if (payload.some(p => !p.student_id || !p.name || !p.course)) {
             throw new Error("Some rows are missing required fields (Student_ID, Name, Course).");
         }
 
-        const { error } = await supabase.from('students').insert(payload);
+        const { error } = await supabase
+            .from('students')
+            .upsert(payload, { onConflict: 'student_id' });
 
         if (error) {
             return { error: error.message };

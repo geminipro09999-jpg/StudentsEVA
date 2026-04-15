@@ -20,10 +20,10 @@ export default async function StudentProfilePage({ params }) {
         return notFound();
     }
 
-    // Use users(name) to join with the users table to get the lecturer's name
+    // Use users(name) and lab_activities(name) to join with the relevant tables
     const { data: feedbacks } = await supabase
         .from('feedbacks')
-        .select('*, users(name)')
+        .select('*, users(name), lab_activities(name)')
         .eq('student_id', id)
         .order('created_at', { ascending: false });
 
@@ -31,6 +31,13 @@ export default async function StudentProfilePage({ params }) {
     const avgRating = validFeedbacks.length
         ? (validFeedbacks.reduce((acc, f) => acc + f.rating, 0) / validFeedbacks.length).toFixed(1)
         : 'N/A';
+
+    const ratingMap = {
+        4: { label: "Excellent", color: "#10b981", icon: "💎" },
+        3: { label: "Good", color: "#3b82f6", icon: "✨" },
+        2: { label: "Poor", color: "#f59e0b", icon: "⚠️" },
+        1: { label: "Bad", color: "#ef4444", icon: "❌" }
+    };
 
     return (
         <div className="container animate-fade-in mt-4">
@@ -57,6 +64,10 @@ export default async function StudentProfilePage({ params }) {
                             <span>Batch:</span>
                             <span style={{ fontWeight: '500' }}>{student.batch}</span>
                         </div>
+                        <div className="d-flex w-full justify-between mt-1" style={{ borderTop: '1px solid var(--card-border)', paddingTop: '0.5rem', marginTop: '0.5rem' }}>
+                            <span>Group:</span>
+                            <span className="badge" style={{ background: 'rgba(99,102,241,0.1)', color: 'var(--accent-color)' }}>{student.group_name || 'No Group'}</span>
+                        </div>
                     </div>
 
                     <div className="glass-card mt-4 text-center">
@@ -66,7 +77,7 @@ export default async function StudentProfilePage({ params }) {
                         </div>
                         {avgRating !== 'N/A' && (
                             <div className="stars justify-center">
-                                {[1, 2, 3, 4, 5].map(star => (
+                                {[1, 2, 3, 4].map(star => (
                                     <span key={star} className={`star ${star <= Math.round(avgRating) ? 'filled' : ''}`}>★</span>
                                 ))}
                             </div>
@@ -90,12 +101,14 @@ export default async function StudentProfilePage({ params }) {
                                         <div className="d-flex justify-between items-center" style={{ marginBottom: '0.75rem' }}>
                                             <div>
                                                 <span className="badge" style={{ background: 'rgba(255,255,255,0.08)', marginRight: '0.5rem' }}>{f.category}</span>
+                                                {f.lab_activities?.name && (
+                                                    <span className="badge" style={{ background: 'rgba(99,102,241,0.1)', color: 'var(--accent-color)', marginRight: '0.5rem' }}>{f.lab_activities.name}</span>
+                                                )}
                                                 <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>by {f.users?.name || 'Unknown'}</span>
                                             </div>
-                                            <div className="stars">
-                                                {[1, 2, 3, 4, 5].map(star => (
-                                                    <span key={star} className={`star ${star <= f.rating ? 'filled' : ''}`} style={{ fontSize: '1rem' }}>★</span>
-                                                ))}
+                                            <div className="d-flex items-center gap-1">
+                                                <span style={{ fontSize: '1.2rem' }}>{ratingMap[f.rating]?.icon}</span>
+                                                <span style={{ fontWeight: '600', color: ratingMap[f.rating]?.color }}>{ratingMap[f.rating]?.label}</span>
                                             </div>
                                         </div>
                                         <p style={{ lineHeight: '1.6' }}>"{f.remark}"</p>

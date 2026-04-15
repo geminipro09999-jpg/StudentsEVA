@@ -1,14 +1,41 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { addFeedback } from "@/app/actions/feedbackActions";
+import { addLabActivity, getLabActivities } from "@/app/actions/labActivityActions";
 import { useRouter } from "next/navigation";
 
-export default function AddFeedbackForm({ students }) {
+const RATING_LABELS = [
+    { value: 5, label: "Excellent", color: "#10b981", icon: "💎" },
+    { value: 4, label: "Very Good", color: "#0ea5e9", icon: "🌟" },
+    { value: 3, label: "Good", color: "#3b82f6", icon: "✨" },
+    { value: 2, label: "Average", color: "#f59e0b", icon: "⚠️" },
+    { value: 1, label: "Bad", color: "#ef4444", icon: "❌" }
+];
+
+export default function AddFeedbackForm({ students, initialLabActivities }) {
     const router = useRouter();
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
-    const [rating, setRating] = useState(5);
+    const [rating, setRating] = useState(5); // Default to Excellent
+    const [labActivities, setLabActivities] = useState(initialLabActivities || []);
+    const [showNewLabInput, setShowNewLabInput] = useState(false);
+    const [newLabName, setNewLabName] = useState("");
+
+    const handleAddLab = async () => {
+        if (!newLabName.trim()) return;
+        setLoading(true);
+        const res = await addLabActivity(newLabName);
+        if (res.error) {
+            setError(res.error);
+        } else {
+            const updated = await getLabActivities();
+            setLabActivities(updated);
+            setShowNewLabInput(false);
+            setNewLabName("");
+        }
+        setLoading(false);
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -16,7 +43,21 @@ export default function AddFeedbackForm({ students }) {
         setError("");
 
         const formData = new FormData(e.currentTarget);
+
+        // Match the string back to the student object
+        const studentSearchValue = formData.get("student_selection");
+        const foundStudent = students.find(s => `${s.name} - ${s.student_id}` === studentSearchValue);
+
+        if (!foundStudent) {
+            setError("Please explicitly select a valid student from the dropdown options.");
+            setLoading(false);
+            return;
+        }
+
+        // Add the real ID
+        formData.append("student_id", foundStudent._id);
         formData.append("rating", rating);
+        formData.delete("student_selection");
 
         const res = await addFeedback(formData);
 
@@ -25,6 +66,7 @@ export default function AddFeedbackForm({ students }) {
             setLoading(false);
         } else {
             router.push("/dashboard");
+            router.refresh();
         }
     };
 
@@ -38,14 +80,63 @@ export default function AddFeedbackForm({ students }) {
 
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                 <div>
-                    <label>Select Student</label>
-                    <select name="student_id" required>
-                        <option value="">-- Choose a student --</option>
+                    <label>Select Student (Name or UT Number)</label>
+                    <input
+                        list="students_list"
+                        name="student_selection"
+                        placeholder="Type to search student name or UT number..."
+                        required
+                        autoComplete="off"
+                        style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--card-border)', background: 'rgba(255,255,255,0.02)', color: 'var(--text-primary)' }}
+                    />
+                    <datalist id="students_list">
                         {students.map(s => (
-                            <option key={s._id} value={s._id}>{s.name} ({s.student_id})</option>
+                            <option key={s._id} value={`${s.name} - ${s.student_id}`} />
                         ))}
-                    </select>
+                    </datalist>
                 </div>
+
+                <div style={{ position: 'relative' }}>
+                    <label>Lab Activity</label>
+                    <div className="d-flex gap-1">
+                        <select name="lab_activity_id" required disabled={showNewLabInput} style={{ flex: 1 }}>
+                            <option value="">-- Select Lab Activity --</option>
+                            {labActivities.map(lab => (
+                                <option key={lab.id} value={lab.id}>{lab.name}</option>
+                            ))}
+                        </select>
+                        <button
+                            type="button"
+                            className="btn btn-secondary"
+                            style={{ padding: '0.4rem 0.8rem' }}
+                            onClick={() => setShowNewLabInput(!showNewLabInput)}
+                        >
+                            {showNewLabInput ? "Cancel" : "New"}
+                        </button>
+                    </div>
+                </div>
+
+                {showNewLabInput && (
+                    <div className="p-3 rounded mb-2" style={{ background: 'rgba(255,255,255,0.03)', border: '1px dashed var(--card-border)' }}>
+                        <label>New Lab Name (e.g. Lab Act 05)</label>
+                        <div className="d-flex gap-1 mt-1">
+                            <input
+                                value={newLabName}
+                                onChange={(e) => setNewLabName(e.target.value)}
+                                placeholder="Enter lab name..."
+                                style={{ flex: 1 }}
+                            />
+                            <button
+                                type="button"
+                                className="btn btn-primary"
+                                onClick={handleAddLab}
+                                disabled={loading}
+                            >
+                                Add
+                            </button>
+                        </div>
+                    </div>
+                )}
 
                 <div>
                     <label>Category</label>
@@ -63,19 +154,49 @@ export default function AddFeedbackForm({ students }) {
                 </div>
 
                 <div>
-                    <label>Rating: {rating} / 5</label>
-                    <div className="stars mt-1">
-                        {[1, 2, 3, 4, 5].map(star => (
-                            <span
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                        <label style={{ fontWeight: '600' }}>Evaluation Rating</label>
+                        <span style={{
+                            fontWeight: '700',
+                            color: RATING_LABELS.find(r => r.value === rating)?.color,
+                            fontSize: '1rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.4rem',
+                            padding: '0.3rem 0.8rem',
+                            borderRadius: '2rem',
+                            background: `${RATING_LABELS.find(r => r.value === rating)?.color}15`,
+                            border: `1px solid ${RATING_LABELS.find(r => r.value === rating)?.color}40`
+                        }}>
+                            {RATING_LABELS.find(r => r.value === rating)?.icon} {RATING_LABELS.find(r => r.value === rating)?.label}
+                        </span>
+                    </div>
+
+                    <div className="d-flex gap-1" style={{ justifyContent: 'center', padding: '1rem', background: 'rgba(255,255,255,0.02)', borderRadius: 'var(--radius-md)', border: '1px solid var(--card-border)' }}>
+                        {[5, 4, 3, 2, 1].map((star) => (
+                            <div
                                 key={star}
-                                className={`star ${star <= rating ? 'filled' : ''}`}
                                 onClick={() => setRating(star)}
-                                style={{ cursor: 'pointer', fontSize: '1.5rem', transition: 'transform 0.1s', display: 'inline-block' }}
-                                onMouseEnter={(e) => e.target.style.transform = 'scale(1.2)'}
-                                onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
+                                style={{
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                                    transform: rating >= star ? 'scale(1.2)' : 'scale(1)',
+                                    padding: '0 0.25rem'
+                                }}
                             >
-                                ★
-                            </span>
+                                <svg
+                                    width="42"
+                                    height="42"
+                                    viewBox="0 0 24 24"
+                                    fill={rating >= star ? (RATING_LABELS.find(r => r.value === rating)?.color) : "rgba(255,255,255,0.1)"}
+                                    style={{
+                                        filter: rating >= star ? `drop-shadow(0 0 8px ${RATING_LABELS.find(r => r.value === star)?.color}60)` : 'none',
+                                        transition: 'fill 0.3s'
+                                    }}
+                                >
+                                    <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
+                                </svg>
+                            </div>
                         ))}
                     </div>
                 </div>

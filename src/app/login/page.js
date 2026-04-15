@@ -26,16 +26,6 @@ export default function LoginPage() {
         }
     };
 
-    const seedDatabase = async () => {
-        try {
-            const res = await fetch("/api/seed");
-            const data = await res.json();
-            alert(data.message || "Seeding complete!");
-        } catch (e) {
-            alert("Error seeding DB.");
-        }
-    }
-
     return (
         <div className="container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', marginTop: '-40px' }}>
             <div className="glass-card animate-fade-in" style={{ width: '100%', maxWidth: '420px', padding: '3rem 2.5rem' }}>
@@ -59,11 +49,6 @@ export default function LoginPage() {
                     </div>
                     <button type="submit" className="btn btn-primary w-full mt-2" style={{ padding: '1rem' }}>Continue to Dashboard →</button>
                 </form>
-                <div className="text-center mt-4 pt-4" style={{ borderTop: '1px solid var(--card-border)' }}>
-                    <button onClick={seedDatabase} className="btn btn-secondary" style={{ fontSize: '0.8rem', padding: '0.5rem 1rem' }}>
-                        🛠️ Initialize Demo Data
-                    </button>
-                </div>
             </div>
         </div>
     );

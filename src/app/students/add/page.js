@@ -128,6 +128,14 @@ export default function AddStudentPage() {
                         </div>
                     </div>
                     <div>
+                        <label>Group Assignment</label>
+                        <select name="group_name">
+                            <option value="">No Group</option>
+                            <option value="Group A">Group A</option>
+                            <option value="Group B">Group B</option>
+                        </select>
+                    </div>
+                    <div>
                         <label>Photo URL (Optional)</label>
                         <input type="url" name="photo_url" placeholder="https://cloudinary.com/..." />
                         <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>You can paste a Cloudinary URL here.</p>

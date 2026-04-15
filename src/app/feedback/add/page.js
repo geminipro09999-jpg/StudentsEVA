@@ -11,6 +11,7 @@ export default async function AddFeedbackPage() {
     }
 
     const { data: students } = await supabase.from('students').select('*') || { data: [] };
+    const { data: labActivities } = await supabase.from('lab_activities').select('*').order('name') || { data: [] };
 
     const serializedStudents = (students || []).map(s => ({
         ...s,
@@ -23,7 +24,7 @@ export default async function AddFeedbackPage() {
                 <h2>Add Student Feedback</h2>
                 <p style={{ color: 'var(--text-secondary)' }}>Provide constructive feedback and a rating for a student.</p>
             </div>
-            <AddFeedbackForm students={serializedStudents} />
+            <AddFeedbackForm students={serializedStudents} initialLabActivities={labActivities || []} />
         </div>
     );
 }

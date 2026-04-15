@@ -16,6 +16,7 @@ export async function addStudent(formData) {
             name: formData.get("name"),
             course: formData.get("course"),
             batch: formData.get("batch"),
+            group_name: formData.get("group_name") || "",
             photo_url: formData.get("photo_url") || ""
         });
 

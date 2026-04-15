@@ -3,6 +3,10 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { supabase } from "@/lib/supabase";
 import StudentDirectory from "@/components/StudentDirectory";
 import { redirect } from "next/navigation";
+import Link from "next/link";
+
+import { getSetting } from "@/app/actions/settingsActions";
+import GoogleSheetSettings from "@/components/GoogleSheetSettings";
 
 export default async function Dashboard() {
     const session = await getServerSession(authOptions);
@@ -13,6 +17,7 @@ export default async function Dashboard() {
 
     const { data: students } = await supabase.from('students').select('*') || { data: [] };
     const { data: feedbacks } = await supabase.from('feedbacks').select('*') || { data: [] };
+    const googleSheetId = await getSetting('google_sheet_id');
 
     const studentsWithRating = (students || []).map(student => {
         const studentFeedbacks = (feedbacks || []).filter(f => f.student_id === student.id);
@@ -41,8 +46,21 @@ export default async function Dashboard() {
                 </div>
                 {session.user.role === 'admin' ? (
                     <div className="glass-card">
-                        <h3 style={{ fontSize: '1.5rem', color: 'var(--warning)', marginTop: '0.4rem' }}>Admin Mode</h3>
-                        <p style={{ fontWeight: '500', marginTop: '0.5rem' }}>Full access to system.</p>
+                        <div className="d-flex justify-between items-center mb-3">
+                            <div>
+                                <h3 style={{ fontSize: '1.5rem', color: 'var(--warning)', marginTop: '0.4rem' }}>Admin Mode</h3>
+                                <p style={{ fontWeight: '500', marginTop: '0.5rem' }}>Full access to system.</p>
+                            </div>
+                            <div className="d-flex gap-1">
+                                <Link href="/users" className="btn btn-secondary" style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}>
+                                    👥 Manage Users
+                                </Link>
+                                <a href="/api/export" className="btn btn-primary" style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}>
+                                    📊 Export Report
+                                </a>
+                            </div>
+                        </div>
+                        <GoogleSheetSettings initialSheetId={googleSheetId} />
                     </div>
                 ) : (
                     <div className="glass-card">
@@ -52,7 +70,7 @@ export default async function Dashboard() {
                 )}
             </div>
 
-            <StudentDirectory students={studentsWithRating} />
+            <StudentDirectory students={studentsWithRating} user={session.user} />
         </div>
     );
 }
