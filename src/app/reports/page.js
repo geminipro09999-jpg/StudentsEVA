@@ -13,8 +13,24 @@ export default async function ReportsPage() {
 
     const { data: feedbacks, error } = await supabase
         .from('feedbacks')
-        .select('*, students:student_id(name, student_id, group_name), lab_activities:lab_activity_id(name, subject_name), users:lecturer_id(name)')
+        .select('*, students(name, student_id, group_name)')
         .order('created_at', { ascending: false });
+
+    // Fallback lookups in case Foreign Keys are missing from the schema cache
+    let allLabs = [];
+    let allUsers = [];
+    try {
+        const labsRes = await supabase.from('lab_activities').select('id, name, subject_name');
+        if (labsRes.data) allLabs = labsRes.data;
+    } catch { }
+
+    try {
+        const usersRes = await supabase.from('users').select('id, name');
+        if (usersRes.data) allUsers = usersRes.data;
+    } catch { }
+
+    const labsMap = allLabs.reduce((acc, l) => { acc[l.id] = l; return acc; }, {});
+    const usersMap = allUsers.reduce((acc, u) => { acc[u.id] = u; return acc; }, {});
 
     if (error) {
         console.error("Error fetching report data", error);
@@ -28,12 +44,12 @@ export default async function ReportsPage() {
         ut_number: f.students?.student_id || 'N/A',
         student_name: f.students?.name || 'N/A',
         group_name: f.students?.group_name || 'N/A',
-        lab_activity: f.lab_activities?.name || 'Manual/Other',
-        subject: f.lab_activities?.subject_name || 'General',
+        lab_activity: labsMap[f.lab_activity_id]?.name || 'Manual/Other',
+        subject: labsMap[f.lab_activity_id]?.subject_name || 'General',
         category: f.category,
         rating: ratingLabels[f.rating] || f.rating,
         remark: f.remark,
-        lecturer: f.users?.name || 'N/A'
+        lecturer: usersMap[f.lecturer_id]?.name || 'N/A'
     }));
 
     return (
