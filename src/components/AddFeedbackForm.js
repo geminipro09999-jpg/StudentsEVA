@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { addFeedback } from "@/app/actions/feedbackActions";
-import { addLabActivity, getLabActivities } from "@/app/actions/labActivityActions";
 import { useRouter } from "next/navigation";
 
 const RATING_LABELS = [
@@ -13,62 +12,49 @@ const RATING_LABELS = [
     { value: 1, label: "Bad", color: "#ef4444", icon: "❌" }
 ];
 
-export default function AddFeedbackForm({ students, initialLabActivities }) {
+export default function AddFeedbackForm({ students, initialSubjects, initialLabActivities, userRole }) {
     const router = useRouter();
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
     const [rating, setRating] = useState(5); // Default to Excellent
-    const [labActivities, setLabActivities] = useState(initialLabActivities || []);
-    const [showNewLabInput, setShowNewLabInput] = useState(false);
-    const [newLabName, setNewLabName] = useState("");
 
-    const handleAddLab = async () => {
-        if (!newLabName.trim()) return;
-        setLoading(true);
-        const res = await addLabActivity(newLabName);
-        if (res.error) {
-            setError(res.error);
-        } else {
-            const updated = await getLabActivities();
-            setLabActivities(updated);
-            setShowNewLabInput(false);
-            setNewLabName("");
-        }
-        setLoading(false);
-    };
+    const [selectedSubject, setSelectedSubject] = useState("");
+    const [selectedLabActivity, setSelectedLabActivity] = useState("");
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setLoading(true);
-        setError("");
+    const filteredLabActivities = selectedSubject
+        ? initialLabActivities.filter(l => l.subject_id === selectedSubject)
+        : initialLabActivities; const handleSubmit = async (e) => {
+            e.preventDefault();
+            setLoading(true);
+            setError("");
 
-        const formData = new FormData(e.currentTarget);
+            const formData = new FormData(e.currentTarget);
 
-        // Match the string back to the student object
-        const studentSearchValue = formData.get("student_selection");
-        const foundStudent = students.find(s => `${s.name} - ${s.student_id}` === studentSearchValue);
+            // Match the string back to the student object
+            const studentSearchValue = formData.get("student_selection");
+            const foundStudent = students.find(s => `${s.name} - ${s.student_id}` === studentSearchValue);
 
-        if (!foundStudent) {
-            setError("Please explicitly select a valid student from the dropdown options.");
-            setLoading(false);
-            return;
-        }
+            if (!foundStudent) {
+                setError("Please explicitly select a valid student from the dropdown options.");
+                setLoading(false);
+                return;
+            }
 
-        // Add the real ID
-        formData.append("student_id", foundStudent._id);
-        formData.append("rating", rating);
-        formData.delete("student_selection");
+            // Add the real ID
+            formData.append("student_id", foundStudent._id);
+            formData.append("rating", rating);
+            formData.delete("student_selection");
 
-        const res = await addFeedback(formData);
+            const res = await addFeedback(formData);
 
-        if (res.error) {
-            setError(res.error);
-            setLoading(false);
-        } else {
-            router.push("/dashboard");
-            router.refresh();
-        }
-    };
+            if (res.error) {
+                setError(res.error);
+                setLoading(false);
+            } else {
+                router.push("/dashboard");
+                router.refresh();
+            }
+        };
 
     return (
         <div className="glass-card" style={{ maxWidth: '600px', margin: '0 auto' }}>
@@ -97,46 +83,22 @@ export default function AddFeedbackForm({ students, initialLabActivities }) {
                 </div>
 
                 <div style={{ position: 'relative' }}>
-                    <label>Lab Activity</label>
-                    <div className="d-flex gap-1">
-                        <select name="lab_activity_id" required disabled={showNewLabInput} style={{ flex: 1 }}>
-                            <option value="">-- Select Lab Activity --</option>
-                            {labActivities.map(lab => (
-                                <option key={lab.id} value={lab.id}>{lab.name}</option>
-                            ))}
-                        </select>
-                        <button
-                            type="button"
-                            className="btn btn-secondary"
-                            style={{ padding: '0.4rem 0.8rem' }}
-                            onClick={() => setShowNewLabInput(!showNewLabInput)}
-                        >
-                            {showNewLabInput ? "Cancel" : "New"}
-                        </button>
-                    </div>
-                </div>
+                    <label>Filter by Subject (Optional)</label>
+                    <select value={selectedSubject} onChange={(e) => { setSelectedSubject(e.target.value); setSelectedLabActivity(""); }} style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--card-border)', background: 'rgba(255,255,255,0.02)', color: 'var(--text-primary)', marginBottom: '1rem' }}>
+                        <option value="">-- All Subjects --</option>
+                        {initialSubjects.map(sub => (
+                            <option key={sub.id} value={sub.id}>{sub.name}</option>
+                        ))}
+                    </select>
 
-                {showNewLabInput && (
-                    <div className="p-3 rounded mb-2" style={{ background: 'rgba(255,255,255,0.03)', border: '1px dashed var(--card-border)' }}>
-                        <label>New Lab Name (e.g. Lab Act 05)</label>
-                        <div className="d-flex gap-1 mt-1">
-                            <input
-                                value={newLabName}
-                                onChange={(e) => setNewLabName(e.target.value)}
-                                placeholder="Enter lab name..."
-                                style={{ flex: 1 }}
-                            />
-                            <button
-                                type="button"
-                                className="btn btn-primary"
-                                onClick={handleAddLab}
-                                disabled={loading}
-                            >
-                                Add
-                            </button>
-                        </div>
-                    </div>
-                )}
+                    <label>Lab Activity</label>
+                    <select name="lab_activity_id" value={selectedLabActivity} onChange={e => setSelectedLabActivity(e.target.value)} required style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--card-border)', background: 'rgba(255,255,255,0.02)', color: 'var(--text-primary)' }}>
+                        <option value="" disabled>-- Select Lab Activity --</option>
+                        {filteredLabActivities.map(lab => (
+                            <option key={lab.id} value={lab.id}>{lab.name}</option>
+                        ))}
+                    </select>
+                </div>
 
                 <div>
                     <label>Category</label>

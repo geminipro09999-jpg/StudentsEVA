@@ -38,6 +38,8 @@ export default function Navbar() {
                     <>
                         <Link href="/students/add" className={`nav-link ${pathname === '/students/add' ? 'active' : ''}`} onClick={() => setIsMobileMenuOpen(false)}>Add Student</Link>
                         <Link href="/users/add" className={`nav-link ${pathname === '/users/add' ? 'active' : ''}`} onClick={() => setIsMobileMenuOpen(false)}>Add User</Link>
+                        <Link href="/reports" className={`nav-link ${pathname === '/reports' ? 'active' : ''}`} onClick={() => setIsMobileMenuOpen(false)}>Reports</Link>
+                        <Link href="/labs-setup" className={`nav-link ${pathname === '/labs-setup' ? 'active' : ''}`} onClick={() => setIsMobileMenuOpen(false)}>Manage Lab Layout</Link>
                     </>
                 )}
                 {session.user.role === 'lecturer' && (

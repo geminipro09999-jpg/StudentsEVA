@@ -6,6 +6,7 @@ ADD COLUMN IF NOT EXISTS group_name TEXT DEFAULT '';
 CREATE TABLE IF NOT EXISTS public.lab_activities (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     name TEXT UNIQUE NOT NULL,
+    subject_name TEXT DEFAULT 'General',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
