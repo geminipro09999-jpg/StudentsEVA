@@ -13,10 +13,11 @@ export default function DashboardCharts({ feedbacks }) {
         feedbacks.forEach(f => {
             if (counts[f.rating] !== undefined) counts[f.rating]++;
         });
-        return Object.entries(counts).map(([rating, count]) => ({
-            name: Object.keys(RATING_LABELS).includes(rating) ? RATING_LABELS[rating] : rating,
-            value: count,
-            fill: COLORS[5 - parseInt(rating)]
+        const ORDER = [5, 4, 3, 2, 1];
+        return ORDER.map(rating => ({
+            name: RATING_LABELS[rating],
+            value: counts[rating],
+            fill: COLORS[5 - rating]
         })).filter(item => item.value > 0);
     }, [feedbacks]);
 

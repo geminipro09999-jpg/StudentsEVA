@@ -14,7 +14,12 @@ export default function ReportDirectory({ feedbacks }) {
     const labs = Array.from(new Set(feedbacks.map(f => f.lab_activity).filter(l => l !== 'Manual/Other')));
     const subjects = Array.from(new Set(feedbacks.map(f => f.subject).filter(s => s !== undefined)));
     const lecturers = Array.from(new Set(feedbacks.map(f => f.lecturer).filter(l => l !== 'N/A')));
-    const ratings = Array.from(new Set(feedbacks.map(f => f.rating)));
+
+    // Enforcing strict order instead of DB-insertion order
+    const orderedLabels = ["Excellent", "Very Good", "Good", "Average", "Bad"];
+    const ratings = Array.from(new Set(feedbacks.map(f => f.rating))).sort((a, b) => {
+        return orderedLabels.indexOf(a) - orderedLabels.indexOf(b);
+    });
 
     const filtered = feedbacks.filter(f => {
         const matchesUt = utQuery === "" || f.ut_number.toLowerCase().includes(utQuery.toLowerCase());

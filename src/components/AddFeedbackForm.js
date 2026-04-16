@@ -131,7 +131,7 @@ export default function AddFeedbackForm({ students, initialSubjects, initialLabA
                         </span>
                     </div>
 
-                    <div className="d-flex gap-1" style={{ justifyContent: 'center', padding: '1rem', background: 'rgba(255,255,255,0.02)', borderRadius: 'var(--radius-md)', border: '1px solid var(--card-border)' }}>
+                    <div className="flex gap-1" style={{ justifyContent: 'center', padding: '1rem', background: 'rgba(255,255,255,0.02)', borderRadius: 'var(--radius-md)', border: '1px solid var(--card-border)' }}>
                         {[5, 4, 3, 2, 1].map((star) => (
                             <div
                                 key={star}

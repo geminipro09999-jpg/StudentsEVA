@@ -20,12 +20,25 @@ export default async function StudentProfilePage({ params }) {
         return notFound();
     }
 
-    // Use users(name) and lab_activities(name) to join with the relevant tables
-    const { data: feedbacks } = await supabase
+    // Bypass PostgREST schema cache issues with manual joins
+    const { data: rawFeedbacks } = await supabase
         .from('feedbacks')
-        .select('*, users(name), lab_activities(name)')
+        .select('*')
         .eq('student_id', id)
         .order('created_at', { ascending: false });
+
+    // Fetch related docs manually
+    const { data: allUsers } = await supabase.from('users').select('id, name');
+    const { data: allLabs } = await supabase.from('lab_activities').select('id, name');
+
+    const usersMap = (allUsers || []).reduce((acc, u) => { acc[u.id] = u; return acc; }, {});
+    const labsMap = (allLabs || []).reduce((acc, l) => { acc[l.id] = l; return acc; }, {});
+
+    const feedbacks = (rawFeedbacks || []).map(f => ({
+        ...f,
+        users: { name: usersMap[f.lecturer_id]?.name || 'Unknown Lecturer' },
+        lab_activities: { name: labsMap[f.lab_activity_id]?.name || 'Unknown Lab' }
+    }));
 
     const validFeedbacks = feedbacks || [];
     const avgRating = validFeedbacks.length
@@ -33,9 +46,10 @@ export default async function StudentProfilePage({ params }) {
         : 'N/A';
 
     const ratingMap = {
-        4: { label: "Excellent", color: "#10b981", icon: "💎" },
+        5: { label: "Excellent", color: "#10b981", icon: "💎" },
+        4: { label: "Very Good", color: "#0ea5e9", icon: "🌟" },
         3: { label: "Good", color: "#3b82f6", icon: "✨" },
-        2: { label: "Poor", color: "#f59e0b", icon: "⚠️" },
+        2: { label: "Average", color: "#f59e0b", icon: "⚠️" },
         1: { label: "Bad", color: "#ef4444", icon: "❌" }
     };
 
@@ -47,7 +61,7 @@ export default async function StudentProfilePage({ params }) {
 
             <div className="profile-grid">
                 <div className="profile-sidebar">
-                    <div className="glass-card text-center d-flex flex-col items-center">
+                    <div className="glass-card text-center flex flex-col items-center">
                         {student.photo_url ? (
                             <img src={student.photo_url} alt="portrait" style={{ width: '150px', height: '150px', objectFit: 'cover', borderRadius: 'var(--radius-lg)', marginBottom: '1.5rem', border: '3px solid rgba(255,255,255,0.1)' }} />
                         ) : (
@@ -56,15 +70,15 @@ export default async function StudentProfilePage({ params }) {
                         <h2 style={{ fontSize: '1.8rem', marginBottom: '0.2rem' }}>{student.name}</h2>
                         <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem' }}>{student.student_id}</p>
 
-                        <div className="d-flex w-full justify-between mt-2" style={{ borderTop: '1px solid var(--card-border)', paddingTop: '1rem' }}>
+                        <div className="flex w-full justify-between mt-2" style={{ borderTop: '1px solid var(--card-border)', paddingTop: '1rem' }}>
                             <span>Course:</span>
                             <span style={{ fontWeight: '500' }}>{student.course}</span>
                         </div>
-                        <div className="d-flex w-full justify-between mt-1">
+                        <div className="flex w-full justify-between mt-1">
                             <span>Batch:</span>
                             <span style={{ fontWeight: '500' }}>{student.batch}</span>
                         </div>
-                        <div className="d-flex w-full justify-between mt-1" style={{ borderTop: '1px solid var(--card-border)', paddingTop: '0.5rem', marginTop: '0.5rem' }}>
+                        <div className="flex w-full justify-between mt-1" style={{ borderTop: '1px solid var(--card-border)', paddingTop: '0.5rem', marginTop: '0.5rem' }}>
                             <span>Group:</span>
                             <span className="badge" style={{ background: 'rgba(99,102,241,0.1)', color: 'var(--accent-color)' }}>{student.group_name || 'No Group'}</span>
                         </div>
@@ -77,7 +91,7 @@ export default async function StudentProfilePage({ params }) {
                         </div>
                         {avgRating !== 'N/A' && (
                             <div className="stars justify-center">
-                                {[1, 2, 3, 4].map(star => (
+                                {[1, 2, 3, 4, 5].map(star => (
                                     <span key={star} className={`star ${star <= Math.round(avgRating) ? 'filled' : ''}`}>★</span>
                                 ))}
                             </div>
@@ -87,7 +101,7 @@ export default async function StudentProfilePage({ params }) {
 
                 <div className="profile-main">
                     <div className="glass-card">
-                        <div className="d-flex justify-between items-center mb-4">
+                        <div className="flex justify-between items-center mb-4">
                             <h3 style={{ fontSize: '1.5rem' }}>Feedback History</h3>
                             <span className="badge" style={{ background: 'rgba(99,102,241,0.2)', color: 'var(--accent-color)' }}>{validFeedbacks.length} Records</span>
                         </div>
@@ -98,7 +112,7 @@ export default async function StudentProfilePage({ params }) {
                             <div className="flex-col gap-2" style={{ gap: '1rem' }}>
                                 {validFeedbacks.map(f => (
                                     <div key={f.id} style={{ background: 'rgba(255,255,255,0.03)', padding: '1.25rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--card-border)' }}>
-                                        <div className="d-flex justify-between items-center" style={{ marginBottom: '0.75rem' }}>
+                                        <div className="flex justify-between items-center" style={{ marginBottom: '0.75rem' }}>
                                             <div>
                                                 <span className="badge" style={{ background: 'rgba(255,255,255,0.08)', marginRight: '0.5rem' }}>{f.category}</span>
                                                 {f.lab_activities?.name && (
@@ -106,7 +120,7 @@ export default async function StudentProfilePage({ params }) {
                                                 )}
                                                 <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>by {f.users?.name || 'Unknown'}</span>
                                             </div>
-                                            <div className="d-flex items-center gap-1">
+                                            <div className="flex items-center gap-1">
                                                 <span style={{ fontSize: '1.2rem' }}>{ratingMap[f.rating]?.icon}</span>
                                                 <span style={{ fontWeight: '600', color: ratingMap[f.rating]?.color }}>{ratingMap[f.rating]?.label}</span>
                                             </div>
