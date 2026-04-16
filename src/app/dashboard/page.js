@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import StudentDirectory from "@/components/StudentDirectory";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import DashboardCharts from "@/components/DashboardCharts";
 
 import { getSetting } from "@/app/actions/settingsActions";
 import GoogleSheetSettings from "@/components/GoogleSheetSettings";
@@ -17,6 +18,7 @@ export default async function Dashboard() {
 
     const { data: students } = await supabase.from('students').select('*') || { data: [] };
     const { data: feedbacks } = await supabase.from('feedbacks').select('*') || { data: [] };
+    const { data: labActivities } = await supabase.from('lab_activities').select('*') || { data: [] };
     const googleSheetId = await getSetting('google_sheet_id');
 
     const studentsWithRating = (students || []).map(student => {
@@ -69,6 +71,8 @@ export default async function Dashboard() {
                     </div>
                 )}
             </div>
+
+            <DashboardCharts feedbacks={feedbacks || []} />
 
             <StudentDirectory students={studentsWithRating} user={session.user} />
         </div>

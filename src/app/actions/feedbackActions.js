@@ -87,9 +87,9 @@ export async function syncAllFeedback() {
                 category,
                 rating,
                 remark,
-                students:student_id (name, student_id),
-                lab_activities:lab_activity_id (name),
-                users:lecturer_id (name)
+                lab_activity_id,
+                lecturer_id,
+                students:student_id (name, student_id)
             `)
             .order('created_at', { ascending: false });
 
@@ -98,10 +98,26 @@ export async function syncAllFeedback() {
             return { error: error.message };
         }
 
+        // Bypassing PostgREST completely for problematic relationships
+        const allLabsRes = await supabase.from('lab_activities').select('id, name');
+        const allLabs = allLabsRes.data || [];
+
+        const allUsersRes = await supabase.from('users').select('id, name');
+        const allUsers = allUsersRes.data || [];
+
+        const labsMap = (allLabs || []).reduce((acc, l) => { acc[l.id] = l; return acc; }, {});
+        const usersMap = (allUsers || []).reduce((acc, u) => { acc[u.id] = u; return acc; }, {});
+
+        const mappedFeedbacks = (feedbacks || []).map(f => ({
+            ...f,
+            lab_activities: { name: labsMap[f.lab_activity_id]?.name || 'Manual/Other' },
+            users: { name: usersMap[f.lecturer_id]?.name || 'N/A' }
+        }));
+
         console.log(`Fetched ${feedbacks?.length} entries. Syncing to sheet...`);
 
         const { syncBulkFeedbackToGoogleSheet } = await import("@/lib/googleSheets");
-        const res = await syncBulkFeedbackToGoogleSheet(sheetId, feedbacks);
+        const res = await syncBulkFeedbackToGoogleSheet(sheetId, mappedFeedbacks);
 
         if (res.error) {
             console.error("Bulk sync error:", res.error);

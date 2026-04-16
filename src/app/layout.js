@@ -7,6 +7,8 @@ export const metadata = {
   description: "A premium role-based evaluation dashboard for educational institutions.",
 };
 
+import { Toaster } from "react-hot-toast";
+
 export default function RootLayout({ children }) {
   return (
     <html lang="en" suppressHydrationWarning>
@@ -14,6 +16,13 @@ export default function RootLayout({ children }) {
         <AuthProvider>
           <Navbar />
           {children}
+          <Toaster position="bottom-right" toastOptions={{
+            style: {
+              background: 'var(--bg-color)',
+              color: 'var(--text-primary)',
+              border: '1px solid var(--card-border)',
+            }
+          }} />
         </AuthProvider>
       </body>
     </html>

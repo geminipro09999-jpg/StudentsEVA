@@ -16,18 +16,14 @@ export default async function ReportsPage() {
         .select('*, students(name, student_id, group_name)')
         .order('created_at', { ascending: false });
 
-    // Fallback lookups in case Foreign Keys are missing from the schema cache
     let allLabs = [];
     let allUsers = [];
-    try {
-        const labsRes = await supabase.from('lab_activities').select('id, name, subject_name');
-        if (labsRes.data) allLabs = labsRes.data;
-    } catch { }
 
-    try {
-        const usersRes = await supabase.from('users').select('id, name');
-        if (usersRes.data) allUsers = usersRes.data;
-    } catch { }
+    const labsRes = await supabase.from('lab_activities').select('id, name, subject_name');
+    if (labsRes.data) allLabs = labsRes.data;
+
+    const usersRes = await supabase.from('users').select('id, name');
+    if (usersRes.data) allUsers = usersRes.data;
 
     const labsMap = allLabs.reduce((acc, l) => { acc[l.id] = l; return acc; }, {});
     const usersMap = allUsers.reduce((acc, u) => { acc[u.id] = u; return acc; }, {});

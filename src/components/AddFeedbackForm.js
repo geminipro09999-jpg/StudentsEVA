@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { addFeedback } from "@/app/actions/feedbackActions";
 import { useRouter } from "next/navigation";
+import toast from "react-hot-toast";
 
 const RATING_LABELS = [
     { value: 5, label: "Excellent", color: "#10b981", icon: "💎" },
@@ -14,7 +15,6 @@ const RATING_LABELS = [
 
 export default function AddFeedbackForm({ students, initialSubjects, initialLabActivities, userRole }) {
     const router = useRouter();
-    const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
     const [rating, setRating] = useState(5); // Default to Excellent
 
@@ -23,46 +23,43 @@ export default function AddFeedbackForm({ students, initialSubjects, initialLabA
 
     const filteredLabActivities = selectedSubject
         ? initialLabActivities.filter(l => l.subject_id === selectedSubject)
-        : initialLabActivities; const handleSubmit = async (e) => {
-            e.preventDefault();
-            setLoading(true);
-            setError("");
+        : initialLabActivities;
 
-            const formData = new FormData(e.currentTarget);
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setLoading(true);
 
-            // Match the string back to the student object
-            const studentSearchValue = formData.get("student_selection");
-            const foundStudent = students.find(s => `${s.name} - ${s.student_id}` === studentSearchValue);
+        const formData = new FormData(e.currentTarget);
 
-            if (!foundStudent) {
-                setError("Please explicitly select a valid student from the dropdown options.");
-                setLoading(false);
-                return;
-            }
+        // Match the string back to the student object
+        const studentSearchValue = formData.get("student_selection");
+        const foundStudent = students.find(s => `${s.name} - ${s.student_id}` === studentSearchValue);
 
-            // Add the real ID
-            formData.append("student_id", foundStudent._id);
-            formData.append("rating", rating);
-            formData.delete("student_selection");
+        if (!foundStudent) {
+            toast.error("Please explicitly select a valid student from the dropdown options.");
+            setLoading(false);
+            return;
+        }
 
-            const res = await addFeedback(formData);
+        // Add the real ID
+        formData.append("student_id", foundStudent._id);
+        formData.append("rating", rating);
+        formData.delete("student_selection");
 
-            if (res.error) {
-                setError(res.error);
-                setLoading(false);
-            } else {
-                router.push("/dashboard");
-                router.refresh();
-            }
-        };
+        const res = await addFeedback(formData);
+
+        if (res.error) {
+            toast.error(res.error);
+            setLoading(false);
+        } else {
+            toast.success("Feedback submitted successfully!");
+            router.push("/dashboard");
+            router.refresh();
+        }
+    };
 
     return (
         <div className="glass-card" style={{ maxWidth: '600px', margin: '0 auto' }}>
-            {error && (
-                <div className="mb-4 p-3 rounded" style={{ background: 'rgba(239, 68, 68, 0.1)', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: 'var(--radius-md)' }}>
-                    {error}
-                </div>
-            )}
 
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                 <div>
