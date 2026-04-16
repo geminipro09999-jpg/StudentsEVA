@@ -29,33 +29,33 @@ export default async function Dashboard() {
     });
 
     return (
-        <div className="container animate-fade-in mt-4">
-            <div style={{ marginBottom: '2rem' }}>
-                <h2>Dashboard</h2>
-                <p style={{ color: 'var(--text-secondary)' }}>Welcome back, {session.user.name}</p>
+        <div className="container animate-fade-in mt-8">
+            <div className="mb-8">
+                <h2 className="text-3xl font-bold">Dashboard</h2>
+                <p className="text-secondary mt-2">Welcome back, <span className="font-semibold text-primary">{session.user.name}</span></p>
             </div>
 
-            <div className="grid grid-cols-3 gap-2 mb-4" style={{ gap: '1.5rem', marginBottom: '2rem' }}>
-                <div className="glass-card">
-                    <h3 style={{ fontSize: '2rem', color: 'var(--accent-color)' }}>{students?.length || 0}</h3>
-                    <p style={{ fontWeight: '500' }}>Total Students</p>
+            <div className="grid grid-cols-3 gap-6 mb-8">
+                <div className="card">
+                    <h3 className="text-4xl font-bold text-accent mb-2">{students?.length || 0}</h3>
+                    <p className="font-medium text-secondary">Total Students</p>
                 </div>
-                <div className="glass-card">
-                    <h3 style={{ fontSize: '2rem', color: 'var(--success)' }}>{feedbacks?.length || 0}</h3>
-                    <p style={{ fontWeight: '500' }}>Total Feedback Entries</p>
+                <div className="card">
+                    <h3 className="text-4xl font-bold text-success mb-2">{feedbacks?.length || 0}</h3>
+                    <p className="font-medium text-secondary">Total Feedback Entries</p>
                 </div>
                 {session.user.role === 'admin' ? (
-                    <div className="glass-card">
-                        <div className="d-flex justify-between items-center mb-3">
+                    <div className="card">
+                        <div className="flex justify-between items-start mb-4 wrap gap-2">
                             <div>
-                                <h3 style={{ fontSize: '1.5rem', color: 'var(--warning)', marginTop: '0.4rem' }}>Admin Mode</h3>
-                                <p style={{ fontWeight: '500', marginTop: '0.5rem' }}>Full access to system.</p>
+                                <h3 className="text-2xl font-bold text-warning">Admin Mode</h3>
+                                <p className="font-medium text-secondary mt-1">Full access to system.</p>
                             </div>
-                            <div className="d-flex gap-1">
-                                <Link href="/users" className="btn btn-secondary" style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}>
+                            <div className="flex gap-2">
+                                <Link href="/users" className="btn btn-secondary px-3 py-1 text-sm font-semibold">
                                     👥 Manage Users
                                 </Link>
-                                <a href="/api/export" className="btn btn-primary" style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}>
+                                <a href="/api/export" className="btn btn-primary px-3 py-1 text-sm font-semibold">
                                     📊 Export Report
                                 </a>
                             </div>
@@ -63,9 +63,9 @@ export default async function Dashboard() {
                         <GoogleSheetSettings initialSheetId={googleSheetId} />
                     </div>
                 ) : (
-                    <div className="glass-card">
-                        <h3 style={{ fontSize: '1.5rem', color: 'var(--success)', marginTop: '0.4rem' }}>Lecturer Mode</h3>
-                        <p style={{ fontWeight: '500', marginTop: '0.5rem' }}>Provide feedback to students.</p>
+                    <div className="card">
+                        <h3 className="text-2xl font-bold text-success">Lecturer Mode</h3>
+                        <p className="font-medium text-secondary mt-2">Provide feedback to students.</p>
                     </div>
                 )}
             </div>

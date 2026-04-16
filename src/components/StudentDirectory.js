@@ -24,44 +24,45 @@ export default function StudentDirectory({ students, user }) {
     });
 
     return (
-        <div className="glass-card">
-            <div className="mb-4">
-                <div className="d-flex justify-between items-center mb-3" style={{ flexWrap: 'wrap', gap: '1rem' }}>
-                    <h3 style={{ margin: 0 }}>Student Directory</h3>
+        <div className="card">
+            <div className="mb-6">
+                <div className="flex justify-between items-center mb-6 wrap gap-4">
+                    <h3 className="text-2xl font-bold m-0">Student Directory</h3>
                     <input
                         type="text"
                         placeholder="Search by name or ID..."
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
-                        style={{ maxWidth: '300px', padding: '0.6rem 1rem' }}
+                        className="max-w-xs"
                     />
                 </div>
 
-                <div className="grid grid-cols-3 gap-1" style={{ borderTop: '1px solid var(--card-border)', paddingTop: '1rem' }}>
+                <div className="grid grid-cols-3 gap-4 pt-4" style={{ borderTop: '1px solid var(--card-border)' }}>
                     <div>
-                        <label style={{ fontSize: '0.75rem', opacity: 0.7 }}>Filter by Group</label>
-                        <select value={groupFilter} onChange={(e) => setGroupFilter(e.target.value)} style={{ padding: '0.4rem' }}>
+                        <label className="text-xs text-secondary mb-1">Filter by Group</label>
+                        <select value={groupFilter} onChange={(e) => setGroupFilter(e.target.value)} className="w-full">
                             <option value="">All Groups</option>
                             {groups.map(g => <option key={g} value={g}>{g}</option>)}
                         </select>
                     </div>
                     <div>
-                        <label style={{ fontSize: '0.75rem', opacity: 0.7 }}>Filter by Course</label>
-                        <select value={courseFilter} onChange={(e) => setCourseFilter(e.target.value)} style={{ padding: '0.4rem' }}>
+                        <label className="text-xs text-secondary mb-1">Filter by Course</label>
+                        <select value={courseFilter} onChange={(e) => setCourseFilter(e.target.value)} className="w-full">
                             <option value="">All Courses</option>
                             {courses.map(c => <option key={c} value={c}>{c}</option>)}
                         </select>
                     </div>
                     <div>
-                        <label style={{ fontSize: '0.75rem', opacity: 0.7 }}>Filter by Batch</label>
-                        <select value={batchFilter} onChange={(e) => setBatchFilter(e.target.value)} style={{ padding: '0.4rem' }}>
+                        <label className="text-xs text-secondary mb-1">Filter by Batch</label>
+                        <select value={batchFilter} onChange={(e) => setBatchFilter(e.target.value)} className="w-full">
                             <option value="">All Batches</option>
                             {batches.map(b => <option key={b} value={b}>{b}</option>)}
                         </select>
                     </div>
                 </div>
             </div>
-            <div style={{ overflowX: 'auto' }}>
+
+            <div className="table-container">
                 <table className="data-table">
                     <thead>
                         <tr>
@@ -78,25 +79,50 @@ export default function StudentDirectory({ students, user }) {
                         {filtered.map(s => (
                             <tr key={s._id}>
                                 <td>
-                                    {s.photo_url ? <img src={s.photo_url} alt="profile" className="avatar" /> : <div className="avatar d-flex items-center justify-center" style={{ background: '#334155' }}><span style={{ fontSize: '10px' }}>N/A</span></div>}
+                                    {s.photo_url ? (
+                                        <img src={s.photo_url} alt="profile" className="avatar" />
+                                    ) : (
+                                        <div className="avatar flex items-center justify-center font-bold text-xs" style={{ background: 'var(--bg-color)' }}>
+                                            N/A
+                                        </div>
+                                    )}
                                 </td>
-                                <td style={{ fontWeight: '500' }}>{s.student_id}</td>
-                                <td>{s.name}</td>
-                                <td><span className="badge" style={{ background: 'rgba(99,102,241,0.1)', color: 'var(--accent-color)' }}>{s.group_name || 'No Group'}</span></td>
-                                <td><span className="badge" style={{ background: 'rgba(255,255,255,0.05)' }}>{s.course}</span> {s.batch}</td>
-                                <td>{s.avgRating !== 'N/A' ? <span style={{ color: '#fbbf24', fontWeight: 'bold' }}>⭐ {s.avgRating} ({s.feedbackCount})</span> : <span style={{ color: 'var(--text-secondary)' }}>No review</span>}</td>
+                                <td className="font-semibold">{s.student_id}</td>
+                                <td className="font-medium text-primary">{s.name}</td>
                                 <td>
-                                    <div className="d-flex gap-1">
-                                        <Link href={`/students/${s._id}`} className="btn btn-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}>Profile</Link>
+                                    <span className="badge" style={{ background: 'var(--accent-light)', color: 'var(--accent-color)' }}>
+                                        {s.group_name || 'No Group'}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span className="badge" style={{ background: 'var(--bg-color)', border: '1px solid var(--card-border)', color: 'var(--text-secondary)' }}>
+                                        {s.course}
+                                    </span>
+                                    <span className="text-sm text-secondary ml-2">{s.batch}</span>
+                                </td>
+                                <td>
+                                    {s.avgRating !== 'N/A' ? (
+                                        <span className="text-warning font-bold">⭐ {s.avgRating} <span className="text-secondary font-medium text-sm">({s.feedbackCount})</span></span>
+                                    ) : (
+                                        <span className="text-secondary text-sm">No review</span>
+                                    )}
+                                </td>
+                                <td>
+                                    <div className="flex gap-2">
+                                        <Link href={`/students/${s._id}`} className="btn btn-secondary px-4 py-2 text-sm">
+                                            Profile
+                                        </Link>
                                         {user?.role === 'admin' && (
-                                            <Link href={`/students/${s._id}/edit`} className="btn btn-primary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', background: 'rgba(99,102,241,0.2)', color: 'var(--accent-color)', border: '1px solid var(--accent-color)' }}>Edit</Link>
+                                            <Link href={`/students/${s._id}/edit`} className="btn btn-primary px-4 py-2 text-sm" style={{ background: 'transparent', color: 'var(--accent-color)', border: '1px solid var(--accent-hover)' }}>
+                                                Edit
+                                            </Link>
                                         )}
                                     </div>
                                 </td>
                             </tr>
                         ))}
                         {filtered.length === 0 && (
-                            <tr><td colSpan="6" className="text-center" style={{ padding: '2rem' }}>No matching students found.</td></tr>
+                            <tr><td colSpan="7" className="text-center p-8 text-secondary">No matching students found.</td></tr>
                         )}
                     </tbody>
                 </table>
