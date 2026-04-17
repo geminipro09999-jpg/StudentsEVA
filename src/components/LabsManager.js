@@ -110,9 +110,13 @@ export default function LabsManager({ initialSubjects, initialActivities }) {
                                         onClick={async () => {
                                             if (confirm(`Are you sure you want to delete ${sub.name} and ALL of its activities?`)) {
                                                 setLoading(true);
-                                                setSubjects(subjects.filter(s => s.id !== sub.id));
-                                                setActivities(activities.filter(a => a.subject_id !== sub.id));
-                                                await deleteSubject(sub.id);
+                                                const res = await deleteSubject(sub.id);
+                                                if (res && res.error) {
+                                                    alert(res.error);
+                                                } else {
+                                                    setSubjects(subjects.filter(s => s.id !== sub.id));
+                                                    setActivities(activities.filter(a => a.subject_id !== sub.id));
+                                                }
                                                 setLoading(false);
                                                 router.refresh();
                                             }
@@ -130,8 +134,12 @@ export default function LabsManager({ initialSubjects, initialActivities }) {
                                                 className="text-xs text-danger opacity-60 hover:opacity-100 hover:scale-110 transition"
                                                 onClick={async () => {
                                                     setLoading(true);
-                                                    setActivities(activities.filter(a => a.id !== act.id));
-                                                    await deleteLabActivity(act.id);
+                                                    const res = await deleteLabActivity(act.id);
+                                                    if (res && res.error) {
+                                                        alert(res.error);
+                                                    } else {
+                                                        setActivities(activities.filter(a => a.id !== act.id));
+                                                    }
                                                     setLoading(false);
                                                     router.refresh();
                                                 }}

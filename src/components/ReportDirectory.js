@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-export default function ReportDirectory({ feedbacks }) {
+export default function ReportDirectory({ feedbacks, allSubjects = [], allLabs = [] }) {
     const [utQuery, setUtQuery] = useState("");
     const [groupFilter, setGroupFilter] = useState("");
     const [labFilter, setLabFilter] = useState("");
@@ -11,8 +11,15 @@ export default function ReportDirectory({ feedbacks }) {
     const [ratingFilter, setRatingFilter] = useState("");
 
     const groups = Array.from(new Set(feedbacks.map(f => f.group_name).filter(g => g !== 'N/A')));
-    const labs = Array.from(new Set(feedbacks.map(f => f.lab_activity).filter(l => l !== 'Manual/Other')));
-    const subjects = Array.from(new Set(feedbacks.map(f => f.subject).filter(s => s !== undefined)));
+
+    const dbLabs = allLabs.map(l => l.name);
+    const extractedLabs = feedbacks.map(f => f.lab_activity).filter(l => l !== 'Manual/Other');
+    const labs = Array.from(new Set([...dbLabs, ...extractedLabs]));
+
+    const dbSubjects = allSubjects.map(s => s.name);
+    const extractedSubjects = feedbacks.map(f => f.subject).filter(s => s !== undefined);
+    const subjects = Array.from(new Set([...dbSubjects, ...extractedSubjects]));
+
     const lecturers = Array.from(new Set(feedbacks.map(f => f.lecturer).filter(l => l !== 'N/A')));
 
     // Enforcing strict order instead of DB-insertion order

@@ -18,9 +18,13 @@ export default async function ReportsPage() {
 
     let allLabs = [];
     let allUsers = [];
+    let allSubjects = [];
 
-    const labsRes = await supabase.from('lab_activities').select('id, name, subject_name');
+    const labsRes = await supabase.from('lab_activities').select('id, name, subject_name, subject_id, subjects(name)');
     if (labsRes.data) allLabs = labsRes.data;
+
+    const subjectsRes = await supabase.from('subjects').select('id, name');
+    if (subjectsRes.data) allSubjects = subjectsRes.data;
 
     const usersRes = await supabase.from('users').select('id, name');
     if (usersRes.data) allUsers = usersRes.data;
@@ -41,7 +45,7 @@ export default async function ReportsPage() {
         student_name: f.students?.name || 'N/A',
         group_name: f.students?.group_name || 'N/A',
         lab_activity: labsMap[f.lab_activity_id]?.name || 'Manual/Other',
-        subject: labsMap[f.lab_activity_id]?.subject_name || 'General',
+        subject: labsMap[f.lab_activity_id]?.subjects?.name || labsMap[f.lab_activity_id]?.subject_name || 'General',
         category: f.category,
         rating: ratingLabels[f.rating] || f.rating,
         remark: f.remark,
@@ -51,7 +55,7 @@ export default async function ReportsPage() {
     return (
         <div className="container animate-fade-in mt-8">
             <h2 className="text-3xl font-bold mb-6">Feedback Reports</h2>
-            <ReportDirectory feedbacks={reportData} />
+            <ReportDirectory feedbacks={reportData} allSubjects={allSubjects} allLabs={allLabs} />
         </div>
     );
 }

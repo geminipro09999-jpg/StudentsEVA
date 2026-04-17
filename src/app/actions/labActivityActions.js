@@ -22,6 +22,25 @@ export async function addSubject(name) {
 }
 
 export async function deleteSubject(id) {
+    // Check if any lab activity under this subject is used in feedbacks
+    const { data: activities, error: actError } = await supabase
+        .from('lab_activities')
+        .select('id')
+        .eq('subject_id', id);
+
+    if (actError) return { error: actError.message };
+
+    if (activities && activities.length > 0) {
+        const activityIds = activities.map(a => a.id);
+        const { count, error: countError } = await supabase
+            .from('feedbacks')
+            .select('*', { count: 'exact', head: true })
+            .in('lab_activity_id', activityIds);
+
+        if (countError) return { error: countError.message };
+        if (count > 0) return { error: 'Cannot delete: One or more lab activities in this subject have existing feedback reports. Data is already taken.' };
+    }
+
     const { error } = await supabase.from('subjects').delete().eq('id', id);
     if (error) return { error: error.message };
     revalidatePath("/labs-setup");
@@ -46,6 +65,14 @@ export async function addLabActivity(name, subject_id) {
 }
 
 export async function deleteLabActivity(id) {
+    const { count, error: countError } = await supabase
+        .from('feedbacks')
+        .select('*', { count: 'exact', head: true })
+        .eq('lab_activity_id', id);
+
+    if (countError) return { error: countError.message };
+    if (count > 0) return { error: 'Cannot delete: This lab activity has existing feedback reports. Data is already taken.' };
+
     const { error } = await supabase.from('lab_activities').delete().eq('id', id);
     if (error) return { error: error.message };
     revalidatePath("/labs-setup");
