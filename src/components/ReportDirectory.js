@@ -16,7 +16,7 @@ export default function ReportDirectory({ feedbacks }) {
     const lecturers = Array.from(new Set(feedbacks.map(f => f.lecturer).filter(l => l !== 'N/A')));
 
     // Enforcing strict order instead of DB-insertion order
-    const orderedLabels = ["Excellent", "Very Good", "Good", "Average", "Bad"];
+    const orderedLabels = ["Bad", "Average", "Good", "Very Good", "Excellent"];
     const ratings = Array.from(new Set(feedbacks.map(f => f.rating))).sort((a, b) => {
         return orderedLabels.indexOf(a) - orderedLabels.indexOf(b);
     });

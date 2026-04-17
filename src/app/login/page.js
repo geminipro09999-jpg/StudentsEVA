@@ -41,11 +41,11 @@ export default function LoginPage() {
                 <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                     <div>
                         <label>Email Address</label>
-                        <input type="email" placeholder="admin@eval.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
+                        <input type="email" placeholder="admin@eval.com" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
                     </div>
                     <div>
                         <label>Password</label>
-                        <input type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required />
+                        <input type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
                     </div>
                     <button type="submit" className="btn btn-primary w-full mt-2" style={{ padding: '1rem' }}>Continue to Dashboard →</button>
                 </form>

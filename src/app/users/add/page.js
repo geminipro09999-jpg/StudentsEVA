@@ -53,15 +53,15 @@ export default function AddUserPage() {
                 <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                     <div>
                         <label>Full Name</label>
-                        <input type="text" name="name" placeholder="Dr. John Doe" required />
+                        <input type="text" name="name" placeholder="Dr. John Doe" required autoComplete="name" />
                     </div>
                     <div>
                         <label>Email Address</label>
-                        <input type="email" name="email" placeholder="john@eval.com" required />
+                        <input type="email" name="email" placeholder="john@eval.com" required autoComplete="email" />
                     </div>
                     <div>
                         <label>Temporary Password</label>
-                        <input type="password" name="password" placeholder="••••••••" required minLength="6" />
+                        <input type="password" name="password" placeholder="••••••••" required minLength="6" autoComplete="new-password" />
                     </div>
                     <div>
                         <label>Role</label>

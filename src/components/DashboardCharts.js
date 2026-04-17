@@ -13,7 +13,7 @@ export default function DashboardCharts({ feedbacks }) {
         feedbacks.forEach(f => {
             if (counts[f.rating] !== undefined) counts[f.rating]++;
         });
-        const ORDER = [5, 4, 3, 2, 1];
+        const ORDER = [1, 2, 3, 4, 5];
         return ORDER.map(rating => ({
             name: RATING_LABELS[rating],
             value: counts[rating],
@@ -29,7 +29,7 @@ export default function DashboardCharts({ feedbacks }) {
         <div className="mb-8 flex justify-center">
             <div className="card w-full max-w-lg text-center">
                 <h3 className="text-xl font-bold mb-4">Rating Distribution</h3>
-                <div style={{ height: '300px' }}>
+                <div style={{ width: '100%', height: 300 }}>
                     <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                             <Pie
@@ -46,7 +46,15 @@ export default function DashboardCharts({ feedbacks }) {
                                 ))}
                             </Pie>
                             <Tooltip contentStyle={{ background: 'var(--bg-color)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-md)' }} />
-                            <Legend />
+                            <Legend
+                                payload={
+                                    ratingDistribution.map(item => ({
+                                        value: item.name,
+                                        type: 'square',
+                                        color: item.fill
+                                    }))
+                                }
+                            />
                         </PieChart>
                     </ResponsiveContainer>
                 </div>
