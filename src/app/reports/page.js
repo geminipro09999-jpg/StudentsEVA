@@ -20,7 +20,7 @@ export default async function ReportsPage() {
     let allUsers = [];
     let allSubjects = [];
 
-    const labsRes = await supabase.from('lab_activities').select('id, name, subject_name, subject_id, subjects(name)');
+    const labsRes = await supabase.from('lab_activities').select('id, name, subject_id, subjects(name)');
     if (labsRes.data) allLabs = labsRes.data;
 
     const subjectsRes = await supabase.from('subjects').select('id, name');
@@ -45,7 +45,7 @@ export default async function ReportsPage() {
         student_name: f.students?.name || 'N/A',
         group_name: f.students?.group_name || 'N/A',
         lab_activity: labsMap[f.lab_activity_id]?.name || 'Manual/Other',
-        subject: labsMap[f.lab_activity_id]?.subjects?.name || labsMap[f.lab_activity_id]?.subject_name || 'General',
+        subject: labsMap[f.lab_activity_id]?.subjects?.name || 'General',
         category: f.category,
         rating: ratingLabels[f.rating] || f.rating,
         remark: f.remark,
