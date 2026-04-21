@@ -128,7 +128,7 @@ export default function StudentDirectory({ students, user }) {
                             <th>Group</th>
                             <th>Course &amp; Batch</th>
                             <th>Avg Rating</th>
-                            <th>Action</th>
+                            <th className="text-right px-6">Operations</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -176,13 +176,13 @@ export default function StudentDirectory({ students, user }) {
                                             <span className="text-secondary text-sm">No review</span>
                                         )}
                                     </td>
-                                    <td>
-                                        <div className="flex gap-2">
-                                            <Link href={`/students/${s._id}`} className="btn btn-secondary px-4 py-2 text-sm">
+                                    <td className="text-right px-6">
+                                        <div className="flex justify-end gap-2">
+                                            <Link href={`/students/${s._id}`} className="btn btn-secondary px-3 py-1.5 text-xs">
                                                 Profile
                                             </Link>
                                             {user?.role === 'admin' && (
-                                                <Link href={`/students/${s._id}/edit`} className="btn btn-primary px-4 py-2 text-sm" style={{ background: 'transparent', color: 'var(--accent-color)', border: '1px solid var(--accent-hover)' }}>
+                                                <Link href={`/students/${s._id}/edit`} className="btn btn-primary px-4 py-2 text-sm" style={{ background: 'var(--accent-color)', color: '#0b1326', boxShadow: '0 4px 12px var(--accent-glow)' }}>
                                                     Edit
                                                 </Link>
                                             )}
