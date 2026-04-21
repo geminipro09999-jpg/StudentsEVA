@@ -265,7 +265,7 @@ button,
    ======================================== */
 .container {
   width: 100%;
-  max-width: 1340px;
+  max-width: 1600px;
   margin: 0 auto;
   padding: 2.5rem 1.5rem;
   position: relative;
@@ -499,15 +499,22 @@ button,
 
 .data-table th,
 .data-table td {
-  padding: 1.1rem 1.5rem;
+  padding: 1rem 1.25rem;
   text-align: left;
   border-bottom: 1px solid var(--card-border);
 }
 
 .data-table th:last-child,
 .data-table td:last-child {
-  padding-right: 2.5rem;
-  /* Extra room for the floating buttons */
+  padding-right: 3rem;
+  position: sticky;
+  right: 0;
+  z-index: 20;
+  background: #0b1326 !important;
+  /* Solid background to prevent see-through on scroll */
+  backdrop-filter: blur(24px) saturate(2);
+  -webkit-backdrop-filter: blur(24px) saturate(2);
+  box-shadow: -12px 0 20px -10px rgba(0, 0, 0, 0.4);
 }
 
 .data-table th {
