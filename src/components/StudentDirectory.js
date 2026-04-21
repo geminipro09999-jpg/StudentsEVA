@@ -128,7 +128,7 @@ export default function StudentDirectory({ students, user }) {
                             <th>Group</th>
                             <th>Course &amp; Batch</th>
                             <th>Avg Rating</th>
-                            <th className="text-right px-6">Operations</th>
+                            <th className="text-right px-6" style={{ minWidth: '160px' }}>Operations</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -176,13 +176,13 @@ export default function StudentDirectory({ students, user }) {
                                             <span className="text-secondary text-sm">No review</span>
                                         )}
                                     </td>
-                                    <td className="text-right px-6">
-                                        <div className="flex justify-end gap-2">
-                                            <Link href={`/students/${s._id}`} className="btn btn-secondary px-3 py-1.5 text-xs">
+                                    <td className="text-right px-6" style={{ overflow: 'visible' }}>
+                                        <div className="flex justify-end gap-3" style={{ padding: '0.2rem', overflow: 'visible' }}>
+                                            <Link href={`/students/${s._id}`} className="btn btn-secondary px-3 py-1.5 text-xs" style={{ margin: '0 2px' }}>
                                                 Profile
                                             </Link>
                                             {user?.role === 'admin' && (
-                                                <Link href={`/students/${s._id}/edit`} className="btn btn-primary px-4 py-2 text-sm" style={{ background: 'var(--accent-color)', color: '#0b1326', boxShadow: '0 4px 12px var(--accent-glow)' }}>
+                                                <Link href={`/students/${s._id}/edit`} className="btn btn-primary px-4 py-2 text-sm" style={{ background: 'var(--accent-color)', color: '#0b1326', boxShadow: '0 4px 12px var(--accent-glow)', margin: '0 2px' }}>
                                                     Edit
                                                 </Link>
                                             )}

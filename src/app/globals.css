@@ -504,6 +504,12 @@ button,
   border-bottom: 1px solid var(--card-border);
 }
 
+.data-table th:last-child,
+.data-table td:last-child {
+  padding-right: 2.5rem;
+  /* Extra room for the floating buttons */
+}
+
 .data-table th {
   background: var(--surface-container-lowest);
   color: var(--text-tertiary);
