@@ -30,86 +30,39 @@ export default function LoginPage() {
     };
 
     return (
-        <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            minHeight: '100vh',
-            padding: '1rem',
-            position: 'relative',
-        }}>
-            {/* Floating orbs */}
-            <div style={{
-                position: 'fixed', top: '15%', left: '10%',
-                width: '300px', height: '300px',
-                background: 'radial-gradient(circle, rgba(99,102,241,0.12), transparent 70%)',
-                borderRadius: '50%', filter: 'blur(40px)', pointerEvents: 'none',
-            }} />
-            <div style={{
-                position: 'fixed', bottom: '15%', right: '10%',
-                width: '250px', height: '250px',
-                background: 'radial-gradient(circle, rgba(192,132,252,0.1), transparent 70%)',
-                borderRadius: '50%', filter: 'blur(40px)', pointerEvents: 'none',
-            }} />
+        <div className="login-wrapper">
+            {/* Ambient Background Glows */}
+            <div className="ambient-orb orb-1"></div>
+            <div className="ambient-orb orb-2"></div>
 
-            <div className="animate-fade-in-scale" style={{
-                width: '100%',
-                maxWidth: '420px',
-                background: 'var(--card-bg)',
-                border: '1px solid var(--card-border)',
-                borderRadius: 'var(--radius-xl)',
-                padding: '2.5rem 2.25rem',
-                backdropFilter: 'blur(20px)',
-                WebkitBackdropFilter: 'blur(20px)',
-                boxShadow: 'var(--shadow-lg), 0 0 60px rgba(99,102,241,0.06)',
-                position: 'relative',
-                zIndex: 1,
-            }}>
-                {/* Logo */}
-                <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-                    <img src="/logo.png" alt="EvalCore" style={{ height: '80px', width: 'auto', margin: '0 auto 0.75rem' }} />
-                    <h2 style={{
-                        fontSize: '1.8rem',
-                        fontWeight: '700',
-                        background: 'linear-gradient(135deg, #818cf8, #c084fc)',
-                        WebkitBackgroundClip: 'text',
-                        WebkitTextFillColor: 'transparent',
-                        marginBottom: '0.4rem',
-                    }}>
-                        EvalCore
-                    </h2>
-                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Sign in to the evaluation system</p>
+            <div className="animate-fade-in-scale glass-card login-card">
+                {/* Brand Header */}
+                <div className="login-header">
+                    <img src="/logo.png" alt="EvalCore" className="login-logo" />
+                    <h2 className="text-gradient">EvalCore</h2>
+                    <p className="text-secondary">Enterprise Student Evaluation</p>
                 </div>
 
                 {error && (
-                    <div style={{
-                        marginBottom: '1.25rem',
-                        padding: '0.75rem 1rem',
-                        background: 'rgba(248, 113, 113, 0.08)',
-                        border: '1px solid rgba(248, 113, 113, 0.2)',
-                        borderRadius: 'var(--radius-md)',
-                        color: 'var(--danger)',
-                        fontSize: '0.85rem',
-                        textAlign: 'center',
-                    }}>
-                        {error}
+                    <div className="error-banner">
+                        <span className="icon">⚠️</span> {error}
                     </div>
                 )}
 
-                <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                    <div>
-                        <label>Email Address</label>
+                <form onSubmit={handleSubmit} className="login-form">
+                    <div className="form-group">
+                        <label>Email Access</label>
                         <input
                             type="email"
-                            placeholder="admin@eval.com"
+                            placeholder="name@unicomtic.com"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             required
                             autoComplete="email"
                         />
                     </div>
-                    <div>
-                        <label>Password</label>
+                    <div className="form-group">
+                        <label>Secure Password</label>
                         <input
                             type="password"
                             placeholder="••••••••"
@@ -121,23 +74,119 @@ export default function LoginPage() {
                     </div>
                     <button
                         type="submit"
-                        className="btn btn-primary w-full"
+                        className="btn btn-primary w-full mt-4"
                         disabled={loading}
-                        style={{
-                            padding: '0.85rem',
-                            marginTop: '0.5rem',
-                            fontSize: '0.95rem',
-                            fontWeight: '600',
-                        }}
                     >
-                        {loading ? '⏳ Signing in...' : 'Continue to Dashboard →'}
+                        {loading ? '⏳ Authenticating...' : 'Sign In to Dashboard →'}
                     </button>
                 </form>
 
-                <div style={{ textAlign: 'center', marginTop: '1.5rem', fontSize: '0.78rem', color: 'var(--text-tertiary)' }}>
+                <div className="login-footer">
                     Student Evaluation System v2.0
                 </div>
             </div>
+
+            <style jsx>{`
+                .login-wrapper {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    min-height: 100vh;
+                    padding: 1.5rem;
+                    position: relative;
+                    overflow: hidden;
+                    background: var(--bg-gradient);
+                }
+
+                .ambient-orb {
+                    position: fixed;
+                    border-radius: 50%;
+                    filter: blur(80px);
+                    pointer-events: none;
+                    z-index: 0;
+                    opacity: 0.5;
+                }
+
+                .orb-1 {
+                    top: 10%;
+                    left: 5%;
+                    width: 400px;
+                    height: 400px;
+                    background: radial-gradient(circle, var(--accent-light), transparent 70%);
+                }
+
+                .orb-2 {
+                    bottom: 10%;
+                    right: 5%;
+                    width: 350px;
+                    height: 350px;
+                    background: radial-gradient(circle, var(--accent-glow), transparent 70%);
+                }
+
+                .login-card {
+                    width: 100%;
+                    max-width: 440px;
+                    padding: 3rem 2.5rem;
+                    z-index: 1;
+                }
+
+                .login-header {
+                    text-align: center;
+                    margin-bottom: 2.5rem;
+                }
+
+                .login-logo {
+                    height: 64px;
+                    width: auto;
+                    margin: 0 auto 1rem;
+                    filter: drop-shadow(0 0 15px var(--accent-glow));
+                }
+
+                .text-gradient {
+                    font-size: 2.2rem;
+                    background: var(--primary-gradient);
+                    -webkit-background-clip: text;
+                    background-clip: text;
+                    -webkit-text-fill-color: transparent;
+                    margin-bottom: 0.5rem;
+                }
+
+                .error-banner {
+                    margin-bottom: 1.5rem;
+                    padding: 0.85rem 1rem;
+                    background: rgba(255, 180, 171, 0.1);
+                    border: 1px solid rgba(255, 180, 171, 0.2);
+                    border-radius: var(--radius-md);
+                    color: var(--danger);
+                    font-size: 0.85rem;
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                }
+
+                .login-form {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 1.5rem;
+                }
+
+                .form-group label {
+                    margin-bottom: 0.6rem;
+                    color: var(--text-tertiary);
+                    font-size: 0.75rem;
+                    text-transform: uppercase;
+                    letter-spacing: 0.08em;
+                }
+
+                .login-footer {
+                    text-align: center;
+                    margin-top: 2rem;
+                    font-size: 0.75rem;
+                    color: var(--text-tertiary);
+                    letter-spacing: 0.02em;
+                    opacity: 0.6;
+                }
+            `}</style>
         </div>
     );
 }

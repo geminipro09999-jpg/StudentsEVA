@@ -1,0 +1,137 @@
+@media (min-width: 769px) {
+    .profile-grid {
+        display: grid;
+        grid-template-columns: 1fr 2fr;
+        gap: 1.5rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .profile-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+}
+
+/* ========================================
+   SCROLLBAR
+   ======================================== */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-hover);
+}
+
+/* ========================================
+   MOBILE BOTTOM NAVIGATION — Floating Pillars
+   ======================================== */
+.bottom-nav {
+    display: none;
+    position: fixed;
+    bottom: 1.5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--nav-bg);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-pill);
+    padding: 0.6rem 1.25rem;
+    gap: 1rem;
+    z-index: 1000;
+    backdrop-filter: blur(24px) saturate(2);
+    -webkit-backdrop-filter: blur(24px) saturate(2);
+    box-shadow: var(--shadow-lg), var(--shadow-glow);
+    width: calc(100% - 2.5rem);
+    max-width: 440px;
+    justify-content: space-around;
+    animation: slideUp 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes slideUp {
+    from {
+        transform: translate(-50%, 120%) scale(0.9);
+        opacity: 0;
+    }
+
+    to {
+        transform: translate(-50%, 0) scale(1);
+        opacity: 1;
+    }
+}
+
+.bottom-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.15rem;
+    color: var(--text-tertiary);
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    transition: var(--transition-spring);
+    text-decoration: none;
+}
+
+.bottom-nav-item .icon {
+    font-size: 1.3rem;
+    transition: var(--transition-spring);
+}
+
+.bottom-nav-item:hover,
+.bottom-nav-item.active {
+    color: var(--accent-color);
+    text-decoration: none;
+}
+
+.bottom-nav-item.active .icon {
+    transform: translateY(-3px) scale(1.1);
+    filter: drop-shadow(0 0 10px var(--accent-glow));
+}
+
+@media (max-width: 768px) {
+    .bottom-nav {
+        display: flex;
+    }
+
+    .navbar .nav-links {
+        display: none;
+    }
+
+    .navbar {
+        padding: 0.8rem 1.25rem;
+    }
+
+    .navbar .logo {
+        font-size: 1.1rem;
+    }
+
+    .nav-actions-desktop {
+        display: none !important;
+    }
+
+    .nav-actions-mobile {
+        display: flex !important;
+        gap: 0.75rem;
+        align-items: center;
+    }
+
+    body {
+        padding-bottom: 7rem;
+    }
+}
+
+.nav-actions-mobile {
+    display: none;
+}

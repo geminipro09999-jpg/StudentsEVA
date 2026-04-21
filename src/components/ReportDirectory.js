@@ -40,75 +40,63 @@ export default function ReportDirectory({ feedbacks, allSubjects = [], allLabs =
     });
 
     return (
-        <div className="card">
+        <div className="glass-card">
             <div className="mb-6">
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                    <div>
-                        <label className="text-sm font-semibold mb-1 block">UT Number Search</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+                    <div className="space-y-2">
+                        <label className="text-xs font-bold text-secondary uppercase tracking-widest">UT Number Search</label>
                         <input
                             type="text"
                             placeholder="e.g. UT001"
                             value={utQuery}
                             onChange={e => setUtQuery(e.target.value)}
-                            className="w-full p-2 border rounded text-sm"
-                            style={{ background: 'var(--bg-color)', borderColor: 'var(--card-border)', color: 'var(--text-primary)' }}
                         />
                     </div>
-                    <div>
-                        <label className="text-sm font-semibold mb-1 block">Group</label>
+                    <div className="space-y-2">
+                        <label className="text-xs font-bold text-secondary uppercase tracking-widest">Group</label>
                         <select
                             value={groupFilter}
                             onChange={e => setGroupFilter(e.target.value)}
-                            className="w-full p-2 border rounded text-sm"
-                            style={{ background: 'var(--bg-color)', borderColor: 'var(--card-border)', color: 'var(--text-primary)' }}
                         >
                             <option value="">All Groups</option>
                             {groups.map(g => <option key={g} value={g}>{g}</option>)}
                         </select>
                     </div>
-                    <div>
-                        <label className="text-sm font-semibold mb-1 block">Subject</label>
+                    <div className="space-y-2">
+                        <label className="text-xs font-bold text-secondary uppercase tracking-widest">Subject</label>
                         <select
                             value={subjectFilter}
                             onChange={e => setSubjectFilter(e.target.value)}
-                            className="w-full p-2 border rounded text-sm"
-                            style={{ background: 'var(--bg-color)', borderColor: 'var(--card-border)', color: 'var(--text-primary)' }}
                         >
                             <option value="">All Subjects</option>
                             {subjects.map(s => <option key={s} value={s}>{s === 'General' ? 'General' : s}</option>)}
                         </select>
                     </div>
-                    <div>
-                        <label className="text-sm font-semibold mb-1 block">Lab Activity</label>
+                    <div className="space-y-2">
+                        <label className="text-xs font-bold text-secondary uppercase tracking-widest">Lab Activity</label>
                         <select
                             value={labFilter}
                             onChange={e => setLabFilter(e.target.value)}
-                            className="w-full p-2 border rounded text-sm"
-                            style={{ background: 'var(--bg-color)', borderColor: 'var(--card-border)', color: 'var(--text-primary)' }}
                         >
                             <option value="">All Labs</option>
                             {labs.map(l => <option key={l} value={l}>{l}</option>)}
                         </select>
                     </div>
-                    <div>
-                        <label className="text-sm font-semibold mb-1 block">Rating</label>
+                    <div className="space-y-2">
+                        <label className="text-xs font-bold text-secondary uppercase tracking-widest">Rating</label>
                         <select
                             value={ratingFilter}
                             onChange={e => setRatingFilter(e.target.value)}
-                            className="w-full p-2 border rounded text-sm"
-                            style={{ background: 'var(--bg-color)', borderColor: 'var(--card-border)', color: 'var(--text-primary)' }}
                         >
                             <option value="">All Ratings</option>
                             {ratings.map(r => <option key={r} value={r}>{r}</option>)}
                         </select>
                     </div>
-                    <div>
-                        <label className="text-sm font-semibold mb-1 block">Lecturer</label>
+                    <div className="space-y-2">
+                        <label className="text-xs font-bold text-secondary uppercase tracking-widest">Lecturer</label>
                         <select
                             value={lecturerFilter}
                             onChange={e => setLecturerFilter(e.target.value)}
-                            className="w-full p-2 border rounded text-sm"
-                            style={{ background: 'var(--bg-color)', borderColor: 'var(--card-border)', color: 'var(--text-primary)' }}
                         >
                             <option value="">All Lecturers</option>
                             {lecturers.map(l => <option key={l} value={l}>{l}</option>)}
@@ -135,15 +123,15 @@ export default function ReportDirectory({ feedbacks, allSubjects = [], allLabs =
                     <tbody>
                         {filtered.map(f => (
                             <tr key={f.id}>
-                                <td className="text-sm text-secondary">{f.date}</td>
-                                <td className="font-semibold text-sm">{f.ut_number}</td>
-                                <td className="text-primary font-medium text-sm">{f.student_name}</td>
-                                <td className="text-sm"><span className="badge" style={{ background: 'var(--bg-color)', border: '1px solid var(--card-border)' }}>{f.group_name}</span></td>
-                                <td className="text-sm text-secondary font-medium">{f.subject}</td>
-                                <td className="text-sm text-secondary">{f.lab_activity}</td>
-                                <td className="text-sm text-warning font-bold">{f.rating}</td>
-                                <td className="text-sm max-w-xs truncate" title={f.remark}>{f.remark}</td>
-                                <td className="text-sm">{f.lecturer}</td>
+                                <td className="text-xs text-secondary">{f.date}</td>
+                                <td className="font-bold text-sm tracking-tight">{f.ut_number}</td>
+                                <td className="text-primary font-bold">{f.student_name}</td>
+                                <td><span className="badge border-accent/20 bg-accent/5 text-accent">{f.group_name}</span></td>
+                                <td className="text-xs font-medium text-secondary/80">{f.subject}</td>
+                                <td className="text-xs font-medium text-secondary/80">{f.lab_activity}</td>
+                                <td className="font-black text-warning tracking-tighter">{f.rating}</td>
+                                <td className="text-xs text-secondary italic max-w-xs truncate" title={f.remark}>"{f.remark}"</td>
+                                <td className="text-xs font-bold text-accent-light">{f.lecturer}</td>
                             </tr>
                         ))}
                         {filtered.length === 0 && (

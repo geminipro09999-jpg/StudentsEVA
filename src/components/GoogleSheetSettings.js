@@ -43,49 +43,47 @@ export default function GoogleSheetSettings({ initialSheetId }) {
         setSyncing(false);
     };
 
-    return (
-        <div className="mt-4 p-4 rounded" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--card-border)' }}>
-            <div className="d-flex items-center gap-1 mb-2">
-                <span style={{ fontSize: '1.2rem' }}>🔗</span>
-                <h4 style={{ margin: 0 }}>Google Sheets Sync</h4>
+    <div className="mt-8 p-6 glass-card border-accent/20 bg-accent/5">
+        <div className="flex items-center gap-3 mb-6">
+            <span className="text-2xl">🔗</span>
+            <h4 className="text-xl font-bold text-accent">Google Sheets Sync</h4>
+        </div>
+
+        <div className="space-y-4">
+            <div>
+                <label className="block text-xs font-bold text-secondary uppercase tracking-widest mb-2">Spreadsheet ID</label>
+                <div className="flex gap-3">
+                    <input
+                        value={sheetId}
+                        onChange={(e) => setSheetId(e.target.value)}
+                        placeholder="e.g. 1ZXnRrI6nnsFqM..."
+                        className="flex-1"
+                    />
+                    <button
+                        className="btn btn-primary"
+                        onClick={handleSave}
+                        disabled={loading}
+                    >
+                        {loading ? "..." : "Connect"}
+                    </button>
+                </div>
             </div>
 
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
-                Spreadsheet ID (from URL)
-            </p>
-
-            <div className="d-flex gap-1">
-                <input
-                    value={sheetId}
-                    onChange={(e) => setSheetId(e.target.value)}
-                    placeholder="1ZXnRrI6nnsFqM..."
-                    style={{ flex: 1 }}
-                />
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-2">
                 <button
-                    className="btn btn-primary"
-                    onClick={handleSave}
-                    disabled={loading}
-                >
-                    {loading ? "..." : "Connect"}
-                </button>
-            </div>
-
-            <div className="mt-3 d-flex justify-between items-center">
-                <button
-                    className="btn btn-secondary"
-                    style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem', background: 'rgba(34, 197, 94, 0.1)', color: 'var(--success)', border: '1px solid var(--success)' }}
+                    className="btn btn-secondary text-sm border-success text-success bg-success/10 hover:bg-success/20 w-full sm:w-auto"
                     onClick={handleSyncAll}
                     disabled={syncing || !sheetId}
                 >
                     {syncing ? "⌛ Syncing..." : "🔄 Sync All Feedback"}
                 </button>
-                {message && <span style={{ fontSize: '0.8rem', fontWeight: '500' }}>{message}</span>}
+                {message && <span className="text-sm font-bold animate-fade-in">{message}</span>}
             </div>
 
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
+            <div className="flex gap-3 p-3 bg-black/20 rounded-lg text-xs leading-relaxed text-secondary border border-white/5">
                 <span>💡</span>
                 <span>Ensure the sheet has a tab named 'Sheet1' and the service account has 'Editor' access.</span>
-            </p>
+            </div>
         </div>
-    );
+    </div>
 }

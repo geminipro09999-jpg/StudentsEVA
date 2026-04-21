@@ -24,16 +24,14 @@ export default function DashboardCharts({ feedbacks }) {
     if (!feedbacks || feedbacks.length === 0) return null;
 
     return (
-        <div className="mb-8 flex justify-center">
-            <div className="glass-card w-full max-w-lg text-center animate-fade-in-scale" style={{ position: 'relative', overflow: 'hidden' }}>
-                {/* Subtle gradient background */}
-                <div style={{
-                    position: 'absolute', top: 0, left: 0, right: 0, height: '3px',
-                    background: 'linear-gradient(90deg, #818cf8, #c084fc, #f0abfc)',
-                    borderRadius: 'var(--radius-xl) var(--radius-xl) 0 0',
-                }} />
-                <div style={{ width: '100%', height: 350, minHeight: 350 }}>
-                    <ResponsiveContainer width="100%" height="100%" debounce={100}>
+        <div className="mb-12 flex justify-center">
+            <div className="glass-card w-full max-w-xl text-center animate-fade-in-scale">
+                <div className="section-header pt-4">
+                    <h2 className="text-lg font-bold">Feedback Analytics</h2>
+                    <p className="text-secondary text-xs">Rating distribution summary</p>
+                </div>
+                <div className="chart-wrapper" style={{ width: '100%', height: 350, position: 'relative' }}>
+                    <ResponsiveContainer width="99%" height="99%" minHeight={350}>
                         <PieChart>
                             <Pie
                                 data={ratingDistribution}

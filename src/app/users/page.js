@@ -45,7 +45,12 @@ export default function UsersPage() {
                     <h2 style={{ fontSize: '2rem' }}>User Management</h2>
                     <p style={{ color: 'var(--text-secondary)' }}>View and manage system users (Admins & Lecturers)</p>
                 </div>
-                <Link href="/dashboard" className="btn btn-secondary">← Back to Dashboard</Link>
+                <div className="flex gap-2">
+                    <Link href="/users/add" className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span>➕</span> Create New User
+                    </Link>
+                    <Link href="/dashboard" className="btn btn-secondary">← Back</Link>
+                </div>
             </div>
 
             {error && (

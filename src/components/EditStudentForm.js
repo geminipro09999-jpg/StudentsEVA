@@ -30,54 +30,60 @@ export default function EditStudentForm({ student }) {
     };
 
     return (
-        <div className="glass-card animate-fade-in" style={{ maxWidth: '600px', margin: '0 auto' }}>
+        <div className="glass-card animate-fade-in mx-auto" style={{ maxWidth: '640px' }}>
+            <div className="section-header">
+                <h2>Edit Student</h2>
+                <p>Update profile information and status.</p>
+            </div>
+
             {error && (
-                <div className="mb-4 p-3 rounded" style={{ background: 'rgba(239, 68, 68, 0.1)', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: 'var(--radius-md)' }}>
-                    {error}
+                <div className="error-banner mb-6">
+                    <span className="icon">⚠️</span> {error}
                 </div>
             )}
 
-            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                <div className="grid grid-cols-2 gap-1">
-                    <div>
-                        <label>Student ID (UT Number)</label>
+            <form onSubmit={handleSubmit} className="flex-col gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="form-group">
+                        <label>Student ID</label>
                         <input name="student_id" defaultValue={student.student_id} required />
                     </div>
-                    <div>
+                    <div className="form-group">
                         <label>Full Name</label>
                         <input name="name" defaultValue={student.name} required />
                     </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-1">
-                    <div>
-                        <label>Course</label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="form-group">
+                        <label>Course Name</label>
                         <input name="course" defaultValue={student.course} required />
                     </div>
-                    <div>
-                        <label>Batch</label>
+                    <div className="form-group">
+                        <label>Batch / Intake</label>
                         <input name="batch" defaultValue={student.batch} required />
                     </div>
                 </div>
 
-                <div>
-                    <label>Group</label>
+                <div className="form-group">
+                    <label>Assigned Group</label>
                     <select name="group_name" defaultValue={student.group_name || ""}>
-                        <option value="">No Group</option>
+                        <option value="">No Group Assigned</option>
                         <option value="Group A">Group A</option>
                         <option value="Group B">Group B</option>
                     </select>
                 </div>
 
-                <div>
-                    <label>Photo URL</label>
-                    <input name="photo_url" defaultValue={student.photo_url} placeholder="https://example.com/photo.jpg" />
+                <div className="form-group">
+                    <label>Profile Image URL</label>
+                    <input name="photo_url" defaultValue={student.photo_url} placeholder="https://..." />
                 </div>
 
                 {/* ── Status Section ────────────────────────────── */}
-                <div style={{ borderTop: '1px solid var(--card-border)', paddingTop: '1.25rem' }}>
-                    <label>Student Status</label>
+                <div className="mt-4 pt-6 border-t border-card-border">
+                    <label className="text-accent">Institutional Status</label>
                     <select
+                        className="mt-2"
                         name="status"
                         value={status}
                         onChange={(e) => setStatus(e.target.value)}
@@ -86,46 +92,35 @@ export default function EditStudentForm({ student }) {
                             color: status === 'discontinued' ? 'var(--danger)' : undefined,
                         }}
                     >
-                        <option value="active">🟢 Active</option>
+                        <option value="active">🟢 Active Student</option>
                         <option value="discontinued">🔴 Discontinued</option>
                     </select>
                 </div>
 
                 {status === 'discontinued' && (
-                    <div
-                        style={{
-                            background: 'rgba(239,68,68,0.07)',
-                            border: '1px solid rgba(239,68,68,0.3)',
-                            borderRadius: 'var(--radius-md)',
-                            padding: '1rem',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '0.75rem',
-                        }}
-                    >
-                        <p style={{ color: 'var(--danger)', fontSize: '0.85rem', margin: 0, fontWeight: '500' }}>
-                            ⚠️ You are marking this student as Discontinued. This student will be excluded from the active directory and appear in the Discontinued Report.
+                    <div className="animate-fade-in-scale p-4 rounded-lg bg-danger-light border border-danger-dim">
+                        <p className="text-danger text-sm font-medium mb-3">
+                            ⚠️ This student will be moved to the archival directory.
                         </p>
-                        <div>
-                            <label>Reason for Discontinuation <span style={{ color: 'var(--danger)' }}>*</span></label>
+                        <div className="form-group">
+                            <label>Reason for Removal</label>
                             <textarea
                                 name="discontinue_reason"
                                 defaultValue={student.discontinue_reason || ""}
-                                placeholder="e.g. Student withdrew due to personal reasons, transferred to another institution..."
+                                placeholder="Please provide specific context..."
                                 required={status === 'discontinued'}
                                 rows={3}
-                                style={{ resize: 'vertical' }}
                             />
                         </div>
                     </div>
                 )}
 
-                <div className="d-flex gap-1 mt-2">
-                    <button type="button" onClick={() => router.back()} className="btn btn-secondary flex-1" style={{ padding: '0.8rem' }}>
+                <div className="flex gap-4 mt-6">
+                    <button type="button" onClick={() => router.back()} className="btn btn-secondary flex-1">
                         Cancel
                     </button>
-                    <button type="submit" disabled={loading} className="btn btn-primary flex-1" style={{ padding: '0.8rem' }}>
-                        {loading ? "Saving..." : "Save Changes"}
+                    <button type="submit" disabled={loading} className="btn btn-primary flex-1">
+                        {loading ? "Processing..." : "Save Changes"}
                     </button>
                 </div>
             </form>

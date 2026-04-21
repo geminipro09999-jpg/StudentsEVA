@@ -55,8 +55,6 @@ export default function LabsManager({ initialSubjects, initialActivities }) {
                         value={newSubjectName}
                         onChange={e => setNewSubjectName(e.target.value)}
                         placeholder="e.g. Graphic Design"
-                        className="flex-1 p-2 rounded border"
-                        style={{ border: '1px solid var(--card-border)', background: 'var(--bg-color)', color: 'var(--text-primary)' }}
                         disabled={loading}
                         required
                     />
@@ -68,8 +66,6 @@ export default function LabsManager({ initialSubjects, initialActivities }) {
                     <select
                         value={selectedTargetSubject}
                         onChange={e => setSelectedTargetSubject(e.target.value)}
-                        className="p-2 rounded border"
-                        style={{ border: '1px solid var(--card-border)', background: 'var(--bg-color)', color: 'var(--text-primary)' }}
                         required
                         disabled={loading}
                     >
@@ -89,61 +85,61 @@ export default function LabsManager({ initialSubjects, initialActivities }) {
                         disabled={loading}
                         required
                     />
-                    <button type="submit" className="btn btn-primary mt-1" disabled={loading}>Attach Activity</button>
+                    <button type="submit" className="btn btn-primary mt-2 w-full" disabled={loading}>Attach Activity</button>
                 </form>
             </div>
 
-            <div className="card">
-                <h3 className="text-xl font-bold mb-4">Live Layout Structure</h3>
+            <div className="glass-card">
+                <div className="section-header">
+                    <h2>Live Layout Structure</h2>
+                    <p>Current subjects and bound activities</p>
+                </div>
                 {subjects.length === 0 && (
-                    <p className="text-secondary italic">No subjects or activities bound yet. Create one to begin!</p>
+                    <div className="text-center py-8 opacity-50">
+                        <div className="text-4xl mb-2">📭</div>
+                        <p>No subjects or activities bound yet.</p>
+                    </div>
                 )}
-                <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-4 mt-4">
                     {subjects.map(sub => {
                         const boundActivities = activities.filter(act => act.subject_id === sub.id);
                         return (
-                            <div key={sub.id} className="p-4 rounded border relative" style={{ border: '1px solid var(--card-border)', background: 'var(--bg-color)' }}>
-                                <div className="flex justify-between items-center mb-2">
-                                    <h4 className="font-bold text-lg text-primary">{sub.name}</h4>
+                            <div key={sub.id} className="p-4 rounded-xl border border-card-border bg-card-bg-solid shadow-sm relative group animate-fade-in">
+                                <div className="flex justify-between items-center mb-3">
+                                    <h4 className="font-bold text-base text-accent">{sub.name}</h4>
                                     <button
-                                        className="text-xs text-danger hover:underline"
+                                        className="text-xs text-danger opacity-0 group-hover:opacity-100 transition-opacity"
                                         onClick={async () => {
-                                            if (confirm(`Are you sure you want to delete ${sub.name} and ALL of its activities?`)) {
+                                            if (confirm(`Are you sure you want to delete ${sub.name}?`)) {
                                                 setLoading(true);
                                                 const res = await deleteSubject(sub.id);
-                                                if (res && res.error) {
-                                                    alert(res.error);
-                                                } else {
+                                                if (!res.error) {
                                                     setSubjects(subjects.filter(s => s.id !== sub.id));
-                                                    setActivities(activities.filter(a => a.subject_id !== sub.id));
                                                 }
                                                 setLoading(false);
                                                 router.refresh();
                                             }
                                         }}
                                     >
-                                        Delete Subject
+                                        Delete
                                     </button>
                                 </div>
-                                <div className="flex flex-col gap-2 mt-3 p-2 bg-black/20 rounded">
-                                    {boundActivities.length === 0 && <span className="text-xs text-secondary">No lab activities bound under this subject yet.</span>}
+                                <div className="flex flex-col gap-2 p-3 bg-black/10 rounded-lg">
+                                    {boundActivities.length === 0 && <span className="text-xs text-secondary opacity-60 italic">No lab activities bound.</span>}
                                     {boundActivities.map(act => (
-                                        <div key={act.id} className="flex justify-between items-center text-sm p-1">
-                                            <span>&#x2022; {act.name}</span>
+                                        <div key={act.id} className="flex justify-between items-center text-sm p-1 hover:bg-white/5 rounded px-2 group/act">
+                                            <span className="text-secondary">&#x2022; {act.name}</span>
                                             <button
-                                                className="text-xs text-danger opacity-60 hover:opacity-100 hover:scale-110 transition"
+                                                className="text-xs text-danger opacity-0 group-hover/act:opacity-100 transition-opacity"
                                                 onClick={async () => {
                                                     setLoading(true);
                                                     const res = await deleteLabActivity(act.id);
-                                                    if (res && res.error) {
-                                                        alert(res.error);
-                                                    } else {
+                                                    if (!res.error) {
                                                         setActivities(activities.filter(a => a.id !== act.id));
                                                     }
                                                     setLoading(false);
                                                     router.refresh();
                                                 }}
-                                                title="Delete Activity"
                                             >
                                                 ✕
                                             </button>

@@ -78,35 +78,35 @@ export default function TimesheetAdmin({ entries, lecturers }) {
     const approvedHours = (entries || []).filter(e => e.status === 'approved').reduce((s, e) => s + Number(e.hours), 0);
 
     return (
-        <div>
+        <div className="animate-fade-in">
             {/* Stats */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
                 {[
                     { label: 'Pending Review', value: pendingCount, icon: '🟡', color: '#fbbf24' },
-                    { label: 'Total Approved Hours', value: approvedHours.toFixed(1) + 'h', icon: '✅', color: '#34d399' },
+                    { label: 'Approved Hours', value: approvedHours.toFixed(1) + 'h', icon: '✅', color: 'var(--success)' },
                     { label: 'Total Entries', value: (entries || []).length, icon: '📋', color: 'var(--accent-color)' },
                 ].map(c => (
-                    <div key={c.label} className="glass-card text-center" style={{ padding: '1rem' }}>
-                        <div style={{ fontSize: '1.5rem' }}>{c.icon}</div>
-                        <div style={{ fontSize: '1.5rem', fontWeight: '700', color: c.color }}>{c.value}</div>
-                        <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{c.label}</div>
+                    <div key={c.label} className="glass-card compact-card text-center flex flex-col items-center justify-center">
+                        <div className="text-xl mb-1">{c.icon}</div>
+                        <div className="text-2xl font-bold" style={{ color: c.color }}>{c.value}</div>
+                        <div className="text-[10px] text-secondary mt-1 font-medium tracking-wide uppercase">{c.label}</div>
                     </div>
                 ))}
             </div>
 
             {/* Filters */}
-            <div className="glass-card mb-4" style={{ padding: '1.25rem' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', alignItems: 'end' }}>
+            <div className="glass-card compact-card p-4 mb-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                     <div>
-                        <label>Lecturer</label>
-                        <select value={filterLecturer} onChange={e => setFilterLecturer(e.target.value)} className="input" style={{ width: '100%' }}>
+                        <label className="block text-xs font-bold text-secondary mb-2 uppercase tracking-wider">Lecturer</label>
+                        <select value={filterLecturer} onChange={e => setFilterLecturer(e.target.value)} className="w-full">
                             <option value="">All Lecturers</option>
                             {(lecturers || []).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
                         </select>
                     </div>
                     <div>
-                        <label>Status</label>
-                        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="input" style={{ width: '100%' }}>
+                        <label className="block text-xs font-bold text-secondary mb-2 uppercase tracking-wider">Status</label>
+                        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="w-full">
                             <option value="">All</option>
                             <option value="pending">Pending</option>
                             <option value="approved">Approved</option>
@@ -114,42 +114,43 @@ export default function TimesheetAdmin({ entries, lecturers }) {
                         </select>
                     </div>
                     <div>
-                        <label>Admin Note (for selected)</label>
-                        <input type="text" placeholder="Optional note..." value={adminNote} onChange={e => setAdminNote(e.target.value)} />
+                        <label className="block text-xs font-bold text-secondary mb-2 uppercase tracking-wider">Bulk Note</label>
+                        <input type="text" placeholder="Optional note for selected..." value={adminNote} onChange={e => setAdminNote(e.target.value)} />
                     </div>
                 </div>
             </div>
 
             {/* Action Buttons */}
             {selected.size > 0 && (
-                <div className="flex gap-3 mb-4 items-center wrap">
-                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{selected.size} selected</span>
-                    <button onClick={() => handleAction('approved')} className="btn btn-primary" disabled={loading} style={{ fontSize: '0.85rem' }}>
-                        ✅ Approve Selected
+                <div className="flex gap-3 mb-4 items-center wrap p-4 bg-accent/10 border border-accent/20 rounded-xl animate-scale-in">
+                    <span className="text-sm font-bold text-accent">{selected.size} entries selected</span>
+                    <button onClick={() => handleAction('approved')} className="btn btn-primary" disabled={loading}>
+                        ✅ Approve
                     </button>
-                    <button onClick={() => handleAction('rejected')} className="btn btn-danger" disabled={loading} style={{ fontSize: '0.85rem' }}>
-                        ❌ Reject Selected
+                    <button onClick={() => handleAction('rejected')} className="btn btn-danger" disabled={loading}>
+                        ❌ Reject
                     </button>
+                    <button onClick={() => setSelected(new Set())} className="btn btn-secondary text-sm ml-auto">Cancel</button>
                 </div>
             )}
 
             {/* Table */}
             {filtered.length === 0 ? (
-                <div className="glass-card text-center" style={{ padding: '3rem', color: 'var(--text-secondary)' }}>
-                    <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>📭</div>
-                    <p>No entries matching the filters.</p>
+                <div className="glass-card text-center py-12">
+                    <div className="text-4xl mb-3">📭</div>
+                    <p className="text-secondary font-medium">No entries matching your search.</p>
                 </div>
             ) : (
-                <div className="glass-card" style={{ padding: 0, overflow: 'hidden' }}>
-                    <div style={{ overflowX: 'auto' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
-                            <thead style={{ background: 'rgba(99,102,241,0.04)' }}>
+                <div className="glass-card overflow-hidden">
+                    <div className="table-container">
+                        <table className="data-table compact-table">
+                            <thead>
                                 <tr>
-                                    <th style={{ padding: '0.8rem 1rem', textAlign: 'center', width: '40px' }}>
+                                    <th className="w-10 text-center">
                                         <input type="checkbox" checked={selected.size === filtered.length && filtered.length > 0} onChange={toggleAll} />
                                     </th>
                                     {['Lecturer', 'Date', 'In', 'Out', 'Hours', 'Status', 'Note'].map(h => (
-                                        <th key={h} style={{ padding: '0.8rem 1rem', textAlign: 'left', color: 'var(--text-secondary)', fontWeight: '500', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid var(--card-border)', whiteSpace: 'nowrap' }}>{h}</th>
+                                        <th key={h}>{h}</th>
                                     ))}
                                 </tr>
                             </thead>
@@ -157,23 +158,23 @@ export default function TimesheetAdmin({ entries, lecturers }) {
                                 {filtered.map(e => {
                                     const s = STATUS_MAP[e.status] || STATUS_MAP.pending;
                                     return (
-                                        <tr key={e.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                                            <td style={{ padding: '0.7rem 1rem', textAlign: 'center' }}>
+                                        <tr key={e.id}>
+                                            <td className="text-center">
                                                 <input type="checkbox" checked={selected.has(e.id)} onChange={() => toggle(e.id)} />
                                             </td>
-                                            <td style={{ padding: '0.7rem 1rem', fontWeight: '500' }}>{lecturerMap[e.lecturer_id] || 'Unknown'}</td>
-                                            <td style={{ padding: '0.7rem 1rem' }}>
+                                            <td className="font-bold text-primary">{lecturerMap[e.lecturer_id] || 'Unknown'}</td>
+                                            <td className="whitespace-nowrap">
                                                 {new Date(e.work_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
                                             </td>
-                                            <td style={{ padding: '0.7rem 1rem' }}>{e.in_time?.slice(0, 5)}</td>
-                                            <td style={{ padding: '0.7rem 1rem' }}>{e.out_time?.slice(0, 5)}</td>
-                                            <td style={{ padding: '0.7rem 1rem', fontWeight: '700', color: 'var(--accent-color)' }}>{Number(e.hours).toFixed(2)}</td>
-                                            <td style={{ padding: '0.7rem 1rem' }}>
-                                                <span style={{ background: s.bg, color: s.color, padding: '3px 10px', borderRadius: '999px', fontSize: '0.75rem', fontWeight: '600' }}>
+                                            <td className="font-mono text-xs opacity-70">{e.in_time?.slice(0, 5)}</td>
+                                            <td className="font-mono text-xs opacity-70">{e.out_time?.slice(0, 5)}</td>
+                                            <td className="font-bold text-accent">{Number(e.hours).toFixed(2)}</td>
+                                            <td>
+                                                <span className="status-pill inline-flex items-center gap-1" style={{ background: s.bg, color: s.color }}>
                                                     {s.icon} {s.label}
                                                 </span>
                                             </td>
-                                            <td style={{ padding: '0.7rem 1rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{e.admin_note || '—'}</td>
+                                            <td className="text-secondary text-xs max-w-xs truncate">{e.admin_note || '—'}</td>
                                         </tr>
                                     );
                                 })}

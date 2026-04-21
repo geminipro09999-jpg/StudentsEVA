@@ -41,60 +41,66 @@ export default async function Dashboard() {
             </div>
 
             {/* Stats Grid */}
-            <div className="grid grid-cols-3 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
                 <div className="stat-card accent animate-fade-in-scale stagger-1">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div className="flex justify-between items-start">
                         <div>
-                            <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.5rem' }}>Active Students</p>
-                            <h3 style={{ fontSize: '2.5rem', fontWeight: '700', color: 'var(--accent-color)', lineHeight: 1 }}>{activeCount}</h3>
-                            <p style={{ fontSize: '0.78rem', color: '#ef4444', marginTop: '0.3rem' }}>{discontinuedCount} Discontinued</p>
+                            <label>Active Students</label>
+                            <h3 className="text-4xl font-bold text-accent">{activeCount}</h3>
+                            <p className="text-xs text-danger mt-2">{discontinuedCount} Discontinued</p>
                         </div>
-                        <div style={{ fontSize: '2.2rem', opacity: 0.6 }}>🎓</div>
+                        <div className="text-4xl opacity-50">🎓</div>
                     </div>
                 </div>
 
                 <div className="stat-card success animate-fade-in-scale stagger-2">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div className="flex justify-between items-start">
                         <div>
-                            <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.5rem' }}>Feedback Entries</p>
-                            <h3 style={{ fontSize: '2.5rem', fontWeight: '700', color: 'var(--success)', lineHeight: 1 }}>{feedbacks?.length || 0}</h3>
+                            <label>Feedback Entries</label>
+                            <h3 className="text-4xl font-bold text-success">{feedbacks?.length || 0}</h3>
                         </div>
-                        <div style={{ fontSize: '2.2rem', opacity: 0.6 }}>📝</div>
+                        <div className="text-4xl opacity-50">📝</div>
                     </div>
                 </div>
 
                 {session.user.role === 'admin' ? (
-                    <div className="stat-card warning animate-fade-in-scale stagger-3">
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                    <div className="stat-card warning animate-fade-in-scale stagger-3 lg:col-span-1 md:col-span-2">
+                        <div className="flex justify-between items-start mb-6">
                             <div>
-                                <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.5rem' }}>Admin Panel</p>
-                                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Full system access</p>
+                                <label>Admin Control</label>
+                                <p className="text-secondary text-sm">System oversight</p>
                             </div>
-                            <div style={{ fontSize: '2.2rem', opacity: 0.6 }}>⚡</div>
+                            <div className="text-4xl opacity-50">⚡</div>
                         </div>
-                        <div className="flex gap-2 wrap">
-                            <Link href="/users" className="btn btn-secondary px-3 py-1 text-sm font-semibold" style={{ fontSize: '0.78rem' }}>
+                        <div className="flex gap-3 wrap">
+                            <Link href="/users" className="btn btn-secondary px-4 py-2">
                                 👥 Users
                             </Link>
-                            <a href="/api/export" className="btn btn-primary px-3 py-1 text-sm font-semibold" style={{ fontSize: '0.78rem' }}>
+                            <Link href="/labs-setup" className="btn btn-secondary px-4 py-2">
+                                🧪 Labs
+                            </Link>
+                            <Link href="/timesheet/invoice" className="btn btn-secondary px-4 py-2">
+                                🧾 Invoices
+                            </Link>
+                            <a href="/api/export" className="btn btn-primary px-4 py-2">
                                 📊 Export
                             </a>
-                            <Link href="/students/discontinued" className="btn btn-secondary px-3 py-1 text-sm font-semibold" style={{ fontSize: '0.78rem', background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)' }}>
-                                🔴 Discontinued ({discontinuedCount})
+                            <Link href="/students/discontinued" className="btn btn-secondary px-4 py-2" style={{ background: 'rgba(239,68,68,0.1)', color: 'var(--danger)', borderColor: 'var(--danger)' }}>
+                                🔴 Discontinued
                             </Link>
                         </div>
-                        <div style={{ marginTop: '0.75rem' }}>
+                        <div className="mt-6 pt-4 border-t border-card-border">
                             <GoogleSheetSettings initialSheetId={googleSheetId} />
                         </div>
                     </div>
                 ) : (
                     <div className="stat-card success animate-fade-in-scale stagger-3">
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div className="flex justify-between items-start">
                             <div>
-                                <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.5rem' }}>Lecturer Mode</p>
-                                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '0.5rem' }}>Provide feedback to students</p>
+                                <label>Lecturer Portal</label>
+                                <p className="text-secondary text-sm mt-2">Active observation mode</p>
                             </div>
-                            <div style={{ fontSize: '2.2rem', opacity: 0.6 }}>📋</div>
+                            <div className="text-4xl opacity-50">📋</div>
                         </div>
                     </div>
                 )}

@@ -292,58 +292,58 @@ export default function InvoiceGenerator({ entries, lecturers }) {
                     <p>No approved entries for {lecturerInfo?.name} in {periodLabel}</p>
                 </div>
             ) : (
-                <div className="glass-card" style={{ padding: '2rem' }}>
+                <div className="glass-card animate-fade-in-scale" style={{ padding: '2.5rem' }}>
                     {/* Invoice Header */}
-                    <div style={{ textAlign: 'center', marginBottom: '1.5rem', paddingBottom: '1rem', borderBottom: '2px solid var(--accent-color)' }}>
-                        <h2 style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--accent-color)' }}>TIMESHEET INVOICE</h2>
-                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Student Evaluation System — UnicomTIC and Innovation Center</p>
+                    <div className="text-center mb-8 pb-4 border-b-2 border-accent">
+                        <h2 className="text-3xl font-extrabold text-accent tracking-tight">TIMESHEET INVOICE</h2>
+                        <p className="text-secondary text-sm mt-1">Student Evaluation System — UnicomTIC and Innovation Center</p>
                     </div>
 
                     {/* Details */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
-                        <div><strong>Lecturer:</strong> {lecturerInfo?.name}</div>
-                        <div><strong>Email:</strong> {lecturerInfo?.email || '—'}</div>
-                        <div><strong>Period:</strong> {periodLabel}</div>
-                        <div><strong>Generated:</strong> {new Date().toLocaleDateString()}</div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-8 mb-8 p-4 rounded-xl bg-black/10 border border-card-border">
+                        <div className="flex gap-2"><strong>Lecturer:</strong> <span className="text-primary font-medium">{lecturerInfo?.name}</span></div>
+                        <div className="flex gap-2"><strong>Email:</strong> <span className="text-secondary">{lecturerInfo?.email || '—'}</span></div>
+                        <div className="flex gap-2"><strong>Period:</strong> <span className="text-primary font-medium">{periodLabel}</span></div>
+                        <div className="flex gap-2"><strong>Generated:</strong> <span className="text-secondary">{new Date().toLocaleDateString()}</span></div>
                     </div>
 
                     {/* Table */}
-                    <div style={{ overflowX: 'auto', marginBottom: '1.5rem' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
+                    <div className="table-container mb-8">
+                        <table className="data-table">
                             <thead>
-                                <tr style={{ background: 'rgba(99,102,241,0.1)' }}>
+                                <tr>
                                     {['#', 'Date', 'In Time', 'Out Time', 'Hours'].map(h => (
-                                        <th key={h} style={{ padding: '0.7rem 1rem', textAlign: 'left', fontWeight: '600', borderBottom: '2px solid var(--accent-color)', color: 'var(--accent-color)', fontSize: '0.8rem' }}>{h}</th>
+                                        <th key={h}>{h}</th>
                                     ))}
                                 </tr>
                             </thead>
                             <tbody>
                                 {filteredEntries.map((e, i) => (
-                                    <tr key={e.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                                        <td style={{ padding: '0.65rem 1rem', color: 'var(--text-secondary)' }}>{i + 1}</td>
-                                        <td style={{ padding: '0.65rem 1rem' }}>
+                                    <tr key={e.id}>
+                                        <td className="text-secondary">{i + 1}</td>
+                                        <td className="font-medium">
                                             {new Date(e.work_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
                                         </td>
-                                        <td style={{ padding: '0.65rem 1rem' }}>{e.in_time?.slice(0, 5)}</td>
-                                        <td style={{ padding: '0.65rem 1rem' }}>{e.out_time?.slice(0, 5)}</td>
-                                        <td style={{ padding: '0.65rem 1rem', fontWeight: '600' }}>{Number(e.hours).toFixed(2)}</td>
+                                        <td>{e.in_time?.slice(0, 5)}</td>
+                                        <td>{e.out_time?.slice(0, 5)}</td>
+                                        <td className="font-bold text-accent">{Number(e.hours).toFixed(2)}</td>
                                     </tr>
                                 ))}
-                                <tr style={{ background: 'rgba(99,102,241,0.05)', borderTop: '2px solid var(--accent-color)' }}>
-                                    <td colSpan="4" style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: '700' }}>TOTAL HOURS</td>
-                                    <td style={{ padding: '0.75rem 1rem', fontWeight: '700', fontSize: '1.1rem', color: 'var(--accent-color)' }}>{totalHours.toFixed(2)}</td>
+                                <tr className="bg-accent-light font-bold" style={{ borderTop: '2px solid var(--accent-color)' }}>
+                                    <td colSpan="4" className="text-right py-4 text-base">TOTAL APPROVED HOURS</td>
+                                    <td className="text-lg text-accent py-4">{totalHours.toFixed(2)}</td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
 
                     {/* Export Buttons */}
-                    <div className="flex gap-3 justify-end wrap">
-                        <button onClick={exportWord} className="btn btn-secondary" style={{ fontSize: '0.88rem' }}>
-                            📝 Export as Word (.docx)
+                    <div className="flex gap-4 justify-end wrap">
+                        <button onClick={exportWord} className="btn btn-secondary">
+                            📝 Export Word
                         </button>
-                        <button onClick={exportPDF} className="btn btn-primary" style={{ fontSize: '0.88rem' }}>
-                            📄 Export as PDF
+                        <button onClick={exportPDF} className="btn btn-primary">
+                            📄 Download PDF
                         </button>
                     </div>
                 </div>
