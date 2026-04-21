@@ -21,53 +21,81 @@ export default async function Dashboard() {
     const { data: labActivities } = await supabase.from('lab_activities').select('*') || { data: [] };
     const googleSheetId = await getSetting('google_sheet_id');
 
+    const activeCount = (students || []).filter(s => (s.status || 'active') === 'active').length;
+    const discontinuedCount = (students || []).filter(s => s.status === 'discontinued').length;
+
     const studentsWithRating = (students || []).map(student => {
         const studentFeedbacks = (feedbacks || []).filter(f => f.student_id === student.id);
         const avgRating = studentFeedbacks.length
             ? (studentFeedbacks.reduce((acc, f) => acc + f.rating, 0) / studentFeedbacks.length).toFixed(1)
             : 'N/A';
-        // Provide _id to child components
         return { ...student, _id: student.id, avgRating, feedbackCount: studentFeedbacks.length };
     });
 
     return (
-        <div className="container animate-fade-in mt-8">
-            <div className="mb-8">
-                <h2 className="text-3xl font-bold">Dashboard</h2>
-                <p className="text-secondary mt-2">Welcome back, <span className="font-semibold text-primary">{session.user.name}</span></p>
+        <div className="container animate-fade-in mt-4">
+            {/* Hero Header */}
+            <div className="page-hero">
+                <h2>Dashboard</h2>
+                <p>Welcome back, <span style={{ color: 'var(--accent-color)', fontWeight: '600' }}>{session.user.name}</span> — here's your overview.</p>
             </div>
 
+            {/* Stats Grid */}
             <div className="grid grid-cols-3 gap-6 mb-8">
-                <div className="card">
-                    <h3 className="text-4xl font-bold text-accent mb-2">{students?.length || 0}</h3>
-                    <p className="font-medium text-secondary">Total Students</p>
-                </div>
-                <div className="card">
-                    <h3 className="text-4xl font-bold text-success mb-2">{feedbacks?.length || 0}</h3>
-                    <p className="font-medium text-secondary">Total Feedback Entries</p>
-                </div>
-                {session.user.role === 'admin' ? (
-                    <div className="card">
-                        <div className="flex justify-between items-start mb-4 wrap gap-2">
-                            <div>
-                                <h3 className="text-2xl font-bold text-warning">Admin Mode</h3>
-                                <p className="font-medium text-secondary mt-1">Full access to system.</p>
-                            </div>
-                            <div className="flex gap-2">
-                                <Link href="/users" className="btn btn-secondary px-3 py-1 text-sm font-semibold">
-                                    👥 Manage Users
-                                </Link>
-                                <a href="/api/export" className="btn btn-primary px-3 py-1 text-sm font-semibold">
-                                    📊 Export Report
-                                </a>
-                            </div>
+                <div className="stat-card accent animate-fade-in-scale stagger-1">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div>
+                            <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.5rem' }}>Active Students</p>
+                            <h3 style={{ fontSize: '2.5rem', fontWeight: '700', color: 'var(--accent-color)', lineHeight: 1 }}>{activeCount}</h3>
+                            <p style={{ fontSize: '0.78rem', color: '#ef4444', marginTop: '0.3rem' }}>{discontinuedCount} Discontinued</p>
                         </div>
-                        <GoogleSheetSettings initialSheetId={googleSheetId} />
+                        <div style={{ fontSize: '2.2rem', opacity: 0.6 }}>🎓</div>
+                    </div>
+                </div>
+
+                <div className="stat-card success animate-fade-in-scale stagger-2">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div>
+                            <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.5rem' }}>Feedback Entries</p>
+                            <h3 style={{ fontSize: '2.5rem', fontWeight: '700', color: 'var(--success)', lineHeight: 1 }}>{feedbacks?.length || 0}</h3>
+                        </div>
+                        <div style={{ fontSize: '2.2rem', opacity: 0.6 }}>📝</div>
+                    </div>
+                </div>
+
+                {session.user.role === 'admin' ? (
+                    <div className="stat-card warning animate-fade-in-scale stagger-3">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                            <div>
+                                <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.5rem' }}>Admin Panel</p>
+                                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Full system access</p>
+                            </div>
+                            <div style={{ fontSize: '2.2rem', opacity: 0.6 }}>⚡</div>
+                        </div>
+                        <div className="flex gap-2 wrap">
+                            <Link href="/users" className="btn btn-secondary px-3 py-1 text-sm font-semibold" style={{ fontSize: '0.78rem' }}>
+                                👥 Users
+                            </Link>
+                            <a href="/api/export" className="btn btn-primary px-3 py-1 text-sm font-semibold" style={{ fontSize: '0.78rem' }}>
+                                📊 Export
+                            </a>
+                            <Link href="/students/discontinued" className="btn btn-secondary px-3 py-1 text-sm font-semibold" style={{ fontSize: '0.78rem', background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)' }}>
+                                🔴 Discontinued ({discontinuedCount})
+                            </Link>
+                        </div>
+                        <div style={{ marginTop: '0.75rem' }}>
+                            <GoogleSheetSettings initialSheetId={googleSheetId} />
+                        </div>
                     </div>
                 ) : (
-                    <div className="card">
-                        <h3 className="text-2xl font-bold text-success">Lecturer Mode</h3>
-                        <p className="font-medium text-secondary mt-2">Provide feedback to students.</p>
+                    <div className="stat-card success animate-fade-in-scale stagger-3">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <div>
+                                <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.5rem' }}>Lecturer Mode</p>
+                                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '0.5rem' }}>Provide feedback to students</p>
+                            </div>
+                            <div style={{ fontSize: '2.2rem', opacity: 0.6 }}>📋</div>
+                        </div>
                     </div>
                 )}
             </div>

@@ -18,17 +18,30 @@ export async function updateStudent(formData) {
         const batch = formData.get("batch");
         const group_name = formData.get("group_name");
         const photo_url = formData.get("photo_url");
+        const status = formData.get("status") || 'active';
+        const discontinue_reason = formData.get("discontinue_reason") || null;
+
+        const updatePayload = {
+            student_id,
+            name,
+            course,
+            batch,
+            group_name,
+            photo_url,
+            status,
+        };
+
+        if (status === 'discontinued') {
+            updatePayload.discontinue_reason = discontinue_reason;
+            updatePayload.discontinued_at = new Date().toISOString();
+        } else {
+            updatePayload.discontinue_reason = null;
+            updatePayload.discontinued_at = null;
+        }
 
         const { error } = await supabase
             .from('students')
-            .update({
-                student_id,
-                name,
-                course,
-                batch,
-                group_name,
-                photo_url
-            })
+            .update(updatePayload)
             .eq('id', id);
 
         if (error) {

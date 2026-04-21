@@ -53,8 +53,11 @@ export default async function ReportsPage() {
     }));
 
     return (
-        <div className="container animate-fade-in mt-8">
-            <h2 className="text-3xl font-bold mb-6">Feedback Reports</h2>
+        <div className="container animate-fade-in mt-4">
+            <div className="page-hero">
+                <h2>📊 Feedback Reports</h2>
+                <p>Analyze and export student feedback data</p>
+            </div>
             <ReportDirectory feedbacks={reportData} allSubjects={allSubjects} allLabs={allLabs} />
         </div>
     );

@@ -20,7 +20,7 @@ export default function Navbar() {
     return (
         <nav className="navbar animate-fade-in">
             <div className="logo">
-                <span>✨</span>
+                <img src="/logo.png" alt="EvalCore" style={{ height: '32px', width: 'auto' }} />
                 <Link href="/dashboard">EvalCore</Link>
             </div>
 
@@ -39,11 +39,16 @@ export default function Navbar() {
                         <Link href="/students/add" className={`nav-link ${pathname === '/students/add' ? 'active' : ''}`} onClick={() => setIsMobileMenuOpen(false)}>Add Student</Link>
                         <Link href="/users/add" className={`nav-link ${pathname === '/users/add' ? 'active' : ''}`} onClick={() => setIsMobileMenuOpen(false)}>Add User</Link>
                         <Link href="/reports" className={`nav-link ${pathname === '/reports' ? 'active' : ''}`} onClick={() => setIsMobileMenuOpen(false)}>Reports</Link>
+                        <Link href="/attendance" className={`nav-link ${pathname === '/attendance' ? 'active' : ''}`} onClick={() => setIsMobileMenuOpen(false)}>Attendance</Link>
+                        <Link href="/timesheet/admin" className={`nav-link ${pathname.startsWith('/timesheet') ? 'active' : ''}`} onClick={() => setIsMobileMenuOpen(false)}>Timesheets</Link>
                         <Link href="/labs-setup" className={`nav-link ${pathname === '/labs-setup' ? 'active' : ''}`} onClick={() => setIsMobileMenuOpen(false)}>Manage Lab Layout</Link>
                     </>
                 )}
                 {session.user.role === 'lecturer' && (
-                    <Link href="/feedback/add" className={`nav-link ${pathname === '/feedback/add' ? 'active' : ''}`} onClick={() => setIsMobileMenuOpen(false)}>Add Feedback</Link>
+                    <>
+                        <Link href="/feedback/add" className={`nav-link ${pathname === '/feedback/add' ? 'active' : ''}`} onClick={() => setIsMobileMenuOpen(false)}>Add Feedback</Link>
+                        <Link href="/timesheet" className={`nav-link ${pathname === '/timesheet' ? 'active' : ''}`} onClick={() => setIsMobileMenuOpen(false)}>Timesheet</Link>
+                    </>
                 )}
 
                 <div className="flex items-center gap-4 ml-4">

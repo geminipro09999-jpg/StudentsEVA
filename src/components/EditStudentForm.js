@@ -8,6 +8,7 @@ export default function EditStudentForm({ student }) {
     const router = useRouter();
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
+    const [status, setStatus] = useState(student.status || "active");
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -72,6 +73,52 @@ export default function EditStudentForm({ student }) {
                     <label>Photo URL</label>
                     <input name="photo_url" defaultValue={student.photo_url} placeholder="https://example.com/photo.jpg" />
                 </div>
+
+                {/* ── Status Section ────────────────────────────── */}
+                <div style={{ borderTop: '1px solid var(--card-border)', paddingTop: '1.25rem' }}>
+                    <label>Student Status</label>
+                    <select
+                        name="status"
+                        value={status}
+                        onChange={(e) => setStatus(e.target.value)}
+                        style={{
+                            borderColor: status === 'discontinued' ? 'var(--danger)' : undefined,
+                            color: status === 'discontinued' ? 'var(--danger)' : undefined,
+                        }}
+                    >
+                        <option value="active">🟢 Active</option>
+                        <option value="discontinued">🔴 Discontinued</option>
+                    </select>
+                </div>
+
+                {status === 'discontinued' && (
+                    <div
+                        style={{
+                            background: 'rgba(239,68,68,0.07)',
+                            border: '1px solid rgba(239,68,68,0.3)',
+                            borderRadius: 'var(--radius-md)',
+                            padding: '1rem',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '0.75rem',
+                        }}
+                    >
+                        <p style={{ color: 'var(--danger)', fontSize: '0.85rem', margin: 0, fontWeight: '500' }}>
+                            ⚠️ You are marking this student as Discontinued. This student will be excluded from the active directory and appear in the Discontinued Report.
+                        </p>
+                        <div>
+                            <label>Reason for Discontinuation <span style={{ color: 'var(--danger)' }}>*</span></label>
+                            <textarea
+                                name="discontinue_reason"
+                                defaultValue={student.discontinue_reason || ""}
+                                placeholder="e.g. Student withdrew due to personal reasons, transferred to another institution..."
+                                required={status === 'discontinued'}
+                                rows={3}
+                                style={{ resize: 'vertical' }}
+                            />
+                        </div>
+                    </div>
+                )}
 
                 <div className="d-flex gap-1 mt-2">
                     <button type="button" onClick={() => router.back()} className="btn btn-secondary flex-1" style={{ padding: '0.8rem' }}>

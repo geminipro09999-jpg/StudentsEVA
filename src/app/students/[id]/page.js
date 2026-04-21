@@ -4,6 +4,11 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+const MONTH_NAMES = [
+    '', 'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+];
+
 export default async function StudentProfilePage({ params }) {
     const session = await getServerSession(authOptions);
 
@@ -31,6 +36,14 @@ export default async function StudentProfilePage({ params }) {
     const { data: allUsers } = await supabase.from('users').select('id, name');
     const { data: allLabs } = await supabase.from('lab_activities').select('id, name');
 
+    // Fetch attendance records for this student
+    const { data: attendanceRecords } = await supabase
+        .from('attendance')
+        .select('*')
+        .eq('student_id', student.student_id)
+        .order('year', { ascending: false })
+        .order('month', { ascending: false });
+
     const usersMap = (allUsers || []).reduce((acc, u) => { acc[u.id] = u; return acc; }, {});
     const labsMap = (allLabs || []).reduce((acc, l) => { acc[l.id] = l; return acc; }, {});
 
@@ -52,6 +65,13 @@ export default async function StudentProfilePage({ params }) {
         2: { label: "Average", color: "#f59e0b", icon: "⚠️" },
         1: { label: "Bad", color: "#ef4444", icon: "❌" }
     };
+
+    // Overall attendance summary
+    const attendance = attendanceRecords || [];
+    const overallPresent = attendance.reduce((s, r) => s + r.present_days, 0);
+    const overallTotal = attendance.reduce((s, r) => s + r.total_days, 0);
+    const overallPct = overallTotal > 0 ? ((overallPresent / overallTotal) * 100).toFixed(1) : null;
+    const overallColor = overallPct >= 75 ? '#10b981' : overallPct >= 50 ? '#f59e0b' : '#ef4444';
 
     return (
         <div className="container animate-fade-in mt-4">
@@ -97,9 +117,77 @@ export default async function StudentProfilePage({ params }) {
                             </div>
                         )}
                     </div>
+
+                    {/* Overall Attendance Card */}
+                    {overallPct !== null && (
+                        <div className="glass-card mt-4 text-center">
+                            <h3 style={{ color: 'var(--text-secondary)', fontWeight: '500', fontSize: '1rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Overall Attendance</h3>
+                            <div style={{ fontSize: '3rem', fontWeight: 'bold', color: overallColor, margin: '0.5rem 0' }}>
+                                {overallPct}%
+                            </div>
+                            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                                {overallPresent} / {overallTotal} days
+                            </div>
+                            <div style={{ marginTop: '0.75rem', height: '8px', background: 'rgba(255,255,255,0.1)', borderRadius: '999px', overflow: 'hidden' }}>
+                                <div style={{ width: `${Math.min(overallPct, 100)}%`, height: '100%', background: overallColor, borderRadius: '999px', transition: 'width 0.5s' }} />
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 <div className="profile-main">
+                    {/* Attendance History */}
+                    <div className="glass-card mb-4">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 style={{ fontSize: '1.5rem' }}>📋 Attendance History</h3>
+                            <span className="badge" style={{ background: 'rgba(16,185,129,0.15)', color: '#10b981' }}>{attendance.length} Month{attendance.length !== 1 ? 's' : ''}</span>
+                        </div>
+
+                        {attendance.length === 0 ? (
+                            <p style={{ color: 'var(--text-secondary)' }}>No attendance data uploaded for this student yet.</p>
+                        ) : (
+                            <div style={{ overflowX: 'auto' }}>
+                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+                                    <thead>
+                                        <tr style={{ borderBottom: '1px solid var(--card-border)' }}>
+                                            {['Month', 'Year', 'Present', 'Total', 'Attendance %', 'Status'].map(h => (
+                                                <th key={h} style={{ padding: '0.6rem 0.75rem', textAlign: 'left', color: 'var(--text-secondary)', fontWeight: '500', whiteSpace: 'nowrap' }}>{h}</th>
+                                            ))}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {attendance.map((rec) => {
+                                            const pct = rec.total_days > 0 ? ((rec.present_days / rec.total_days) * 100) : 0;
+                                            const pctStr = pct.toFixed(1);
+                                            const color = pct >= 75 ? '#10b981' : pct >= 50 ? '#f59e0b' : '#ef4444';
+                                            const statusLabel = pct >= 75 ? '✅ Good' : pct >= 50 ? '⚠️ Average' : '❌ At Risk';
+                                            return (
+                                                <tr key={rec.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                                                    <td style={{ padding: '0.65rem 0.75rem', fontWeight: '500' }}>{MONTH_NAMES[rec.month]}</td>
+                                                    <td style={{ padding: '0.65rem 0.75rem' }}>{rec.year}</td>
+                                                    <td style={{ padding: '0.65rem 0.75rem' }}>{rec.present_days}</td>
+                                                    <td style={{ padding: '0.65rem 0.75rem' }}>{rec.total_days}</td>
+                                                    <td style={{ padding: '0.65rem 0.75rem' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                            <div style={{ width: '60px', height: '5px', background: 'rgba(255,255,255,0.1)', borderRadius: '999px' }}>
+                                                                <div style={{ width: `${Math.min(pct, 100)}%`, height: '100%', background: color, borderRadius: '999px' }} />
+                                                            </div>
+                                                            <span style={{ color, fontWeight: '600' }}>{pctStr}%</span>
+                                                        </div>
+                                                    </td>
+                                                    <td style={{ padding: '0.65rem 0.75rem' }}>
+                                                        <span style={{ background: `${color}22`, color, padding: '2px 8px', borderRadius: '999px', fontSize: '0.78rem', fontWeight: '600', whiteSpace: 'nowrap' }}>{statusLabel}</span>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Feedback History */}
                     <div className="glass-card">
                         <div className="flex justify-between items-center mb-4">
                             <h3 style={{ fontSize: '1.5rem' }}>Feedback History</h3>
