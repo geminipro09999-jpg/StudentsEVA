@@ -62,17 +62,19 @@ export const authOptions = {
         },
         async session({ session, token }) {
             if (token) {
-                session.user.roles = token.roles;
+                session.user.roles = token.roles || [];
                 session.user.id = token.id;
                 session.user.address = token.address;
                 session.user.phone = token.phone;
 
-                // Compatibility with old role check
-                // Prefer 'admin' if present, otherwise first role, default to 'lecturer'
-                if (token.roles?.includes('admin')) {
-                    session.user.role = 'admin';
+                // Robust role check: prioritize 'admin' or 'administrator'
+                const roles = session.user.roles;
+                const adminRole = roles.find(r => r === 'admin' || r === 'administrator');
+
+                if (adminRole) {
+                    session.user.role = adminRole;
                 } else {
-                    session.user.role = token.roles?.[0] || 'lecturer';
+                    session.user.role = roles[0] || 'lecturer';
                 }
             }
             return session;

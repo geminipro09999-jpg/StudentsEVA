@@ -16,14 +16,13 @@ export default async function Dashboard() {
         redirect("/login");
     }
 
-    // Role checks
     const roles = session.user.roles || [session.user.role];
-    const isAdmin = roles.includes('admin');
+    const isAdminAccount = roles.some(r => ['admin', 'administrator'].includes(r));
     const isLecturer = roles.includes('lecturer');
     const isStaff = roles.includes('incubator_staff');
 
     // If ONLY incubator staff, they don't have access to dashboard
-    if (isStaff && !isAdmin && !isLecturer) {
+    if (isStaff && !isAdminAccount && !isLecturer) {
         redirect("/timesheet/invoice");
     }
 
@@ -98,7 +97,7 @@ export default async function Dashboard() {
                     </div>
                 </div>
 
-                {roles.includes('admin') ? (
+                {isAdminAccount ? (
                     <div className="stat-card warning animate-fade-in-scale stagger-4">
                         <div className="flex justify-between items-start mb-6">
                             <div>

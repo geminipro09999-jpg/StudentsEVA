@@ -17,7 +17,8 @@ export default function Navbar() {
     if (!session) return null;
 
     const roles = session.user.roles || [session.user.role];
-    const isPureStaff = roles.includes('incubator_staff') && roles.length === 1;
+    const isAdminAccount = roles.some(r => ['admin', 'administrator'].includes(r));
+    const isPureStaff = roles.includes('incubator_staff') && roles.length === 1 && !isAdminAccount;
 
     return (
         <>
@@ -32,7 +33,7 @@ export default function Navbar() {
                     {!isPureStaff && (
                         <Link href="/dashboard" className={`nav-link ${pathname === '/dashboard' ? 'active' : ''}`}>Dashboard</Link>
                     )}
-                    {roles.includes('admin') && (
+                    {isAdminAccount && (
                         <>
                             <Link href="/students/add" className={`nav-link ${pathname === '/students/add' ? 'active' : ''}`}>Add Student</Link>
                             <Link href="/attendance" className={`nav-link ${pathname === '/attendance' ? 'active' : ''}`}>Attendance</Link>
@@ -120,7 +121,7 @@ export default function Navbar() {
                             <span className="icon">🏠</span>
                             <span>Home</span>
                         </Link>
-                        {roles.includes('admin') ? (
+                        {isAdminAccount ? (
                             <>
                                 <Link href="/students/add" className={`bottom-nav-item ${pathname === '/students/add' ? 'active' : ''}`}>
                                     <span className="icon">➕</span>
