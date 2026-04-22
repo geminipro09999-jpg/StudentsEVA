@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 
 const STATUS_TABS = [
@@ -15,10 +15,11 @@ export default function StudentDirectory({ students, user }) {
     const [courseFilter, setCourseFilter] = useState("");
     const [batchFilter, setBatchFilter] = useState("");
     const [statusTab, setStatusTab] = useState("active");
+    const [viewMode, setViewMode] = useState("table"); // 'table' or 'grouped'
 
-    const groups = Array.from(new Set(students.map(s => s.group_name).filter(Boolean)));
-    const courses = Array.from(new Set(students.map(s => s.course).filter(Boolean)));
-    const batches = Array.from(new Set(students.map(s => s.batch).filter(Boolean)));
+    const groups = Array.from(new Set(students.map(s => s.group_name).filter(Boolean))).sort();
+    const courses = Array.from(new Set(students.map(s => s.course).filter(Boolean))).sort();
+    const batches = Array.from(new Set(students.map(s => s.batch).filter(Boolean))).sort();
 
     const activeCount = students.filter(s => (s.status || 'active') === 'active').length;
     const discontinuedCount = students.filter(s => s.status === 'discontinued').length;
@@ -37,6 +38,17 @@ export default function StudentDirectory({ students, user }) {
 
         return matchesQuery && matchesGroup && matchesCourse && matchesBatch && matchesStatus;
     });
+
+    const groupedData = useMemo(() => {
+        if (viewMode !== "grouped") return null;
+        const grouped = {};
+        filtered.forEach(s => {
+            const g = s.group_name || "Unassigned";
+            if (!grouped[g]) grouped[g] = [];
+            grouped[g].push(s);
+        });
+        return grouped;
+    }, [filtered, viewMode]);
 
     return (
         <div className="card">
@@ -59,40 +71,48 @@ export default function StudentDirectory({ students, user }) {
                     />
                 </div>
 
-                {/* Status Tabs */}
-                <div className="flex gap-2 mb-4">
-                    {STATUS_TABS.map(tab => (
+                {/* Status Tabs & View Toggle */}
+                <div className="flex justify-between items-center mb-4 wrap gap-4">
+                    <div className="flex gap-2">
+                        {STATUS_TABS.map(tab => (
+                            <button
+                                key={tab.key}
+                                onClick={() => setStatusTab(tab.key)}
+                                className="btn"
+                                style={{
+                                    padding: '0.4rem 1rem',
+                                    fontSize: '0.85rem',
+                                    fontWeight: '600',
+                                    background: statusTab === tab.key ? 'var(--accent-color)' : 'transparent',
+                                    color: statusTab === tab.key ? '#fff' : 'var(--text-secondary)',
+                                    border: `1px solid ${statusTab === tab.key ? 'var(--accent-color)' : 'var(--card-border)'}`,
+                                    borderRadius: 'var(--radius-md)',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s',
+                                }}
+                            >
+                                {tab.label}
+                            </button>
+                        ))}
+                    </div>
+
+                    <div className="flex gap-2 bg-black/20 p-1 rounded-lg border border-card-border">
                         <button
-                            key={tab.key}
-                            onClick={() => setStatusTab(tab.key)}
-                            className="btn"
-                            style={{
-                                padding: '0.4rem 1rem',
-                                fontSize: '0.85rem',
-                                fontWeight: '600',
-                                background: statusTab === tab.key ? 'var(--accent-color)' : 'transparent',
-                                color: statusTab === tab.key ? '#fff' : 'var(--text-secondary)',
-                                border: `1px solid ${statusTab === tab.key ? 'var(--accent-color)' : 'var(--card-border)'}`,
-                                borderRadius: 'var(--radius-md)',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s',
-                            }}
+                            onClick={() => setViewMode("table")}
+                            className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === 'table' ? 'bg-accent text-white shadow-lg' : 'text-secondary hover:text-primary'}`}
                         >
-                            {tab.label}
+                            📑 List View
                         </button>
-                    ))}
-                    {user?.role === 'admin' && (
-                        <Link
-                            href="/students/discontinued"
-                            className="btn btn-secondary"
-                            style={{ padding: '0.4rem 1rem', fontSize: '0.85rem', fontWeight: '600', marginLeft: 'auto' }}
+                        <button
+                            onClick={() => setViewMode("grouped")}
+                            className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === 'grouped' ? 'bg-accent text-white shadow-lg' : 'text-secondary hover:text-primary'}`}
                         >
-                            📋 Discontinued Report
-                        </Link>
-                    )}
+                            🗂️ Group View
+                        </button>
+                    </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4 pt-4" style={{ borderTop: '1px solid var(--card-border)' }}>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4" style={{ borderTop: '1px solid var(--card-border)' }}>
                     <div>
                         <label className="text-xs text-secondary mb-1">Filter by Group</label>
                         <select value={groupFilter} onChange={(e) => setGroupFilter(e.target.value)} className="w-full">
@@ -117,86 +137,137 @@ export default function StudentDirectory({ students, user }) {
                 </div>
             </div>
 
-            <div className="table-container">
-                <table className="data-table">
-                    <thead>
-                        <tr>
-                            <th>Photo</th>
-                            <th>ID</th>
-                            <th>Name</th>
-                            <th>Status</th>
-                            <th>Group</th>
-                            <th>Course &amp; Batch</th>
-                            <th>Avg Rating</th>
-                            <th className="text-right px-6" style={{ minWidth: '160px' }}>Operations</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {filtered.map(s => {
-                            const isDiscontinued = s.status === 'discontinued';
-                            return (
-                                <tr key={s._id} style={{ opacity: isDiscontinued ? 0.7 : 1 }}>
-                                    <td>
+            {viewMode === "table" ? (
+                <div className="table-container pt-2">
+                    <table className="data-table">
+                        <thead>
+                            <tr style={{ background: 'transparent' }}>
+                                <th className="pl-6">Photo</th>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>Status</th>
+                                <th>Group</th>
+                                <th>Course &amp; Batch</th>
+                                <th>Avg Rating</th>
+                                <th className="text-right px-6" style={{ minWidth: '160px' }}>Operations</th>
+                            </tr>
+                        </thead>
+                        <tbody className="space-y-4">
+                            {filtered.map(s => {
+                                const isDiscontinued = s.status === 'discontinued';
+                                return (
+                                    <tr key={s._id} className="card-hover" style={{
+                                        opacity: isDiscontinued ? 0.7 : 1,
+                                        background: 'var(--card-bg)',
+                                        marginBottom: '1rem',
+                                        borderRadius: 'var(--radius-lg)',
+                                        display: 'table-row'
+                                    }}>
+                                        <td className="pl-6 py-4">
+                                            {s.photo_url ? (
+                                                <img src={s.photo_url} alt="profile" style={{ width: '64px', height: '64px', borderRadius: 'var(--radius-md)', objectFit: 'cover', border: '2px solid var(--card-border)', boxShadow: '0 4px 12px rgba(99,102,241,0.15)' }} />
+                                            ) : (
+                                                <div style={{ width: '64px', height: '64px', borderRadius: 'var(--radius-md)', background: 'var(--accent-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '600', fontSize: '0.9rem', color: 'var(--accent-color)', border: '2px solid var(--card-border)' }}>
+                                                    {s.name.charAt(0)}
+                                                </div>
+                                            )}
+                                        </td>
+                                        <td className="font-semibold text-sm">{s.student_id}</td>
+                                        <td className="font-medium text-primary">{s.name}</td>
+                                        <td>
+                                            {isDiscontinued ? (
+                                                <span className="badge" style={{ background: 'rgba(239,68,68,0.12)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)', whiteSpace: 'nowrap' }}>
+                                                    🔴 Discontinued
+                                                </span>
+                                            ) : (
+                                                <span className="badge" style={{ background: 'rgba(16,185,129,0.12)', color: '#10b981', border: '1px solid rgba(16,185,129,0.3)', whiteSpace: 'nowrap' }}>
+                                                    🟢 Active
+                                                </span>
+                                            )}
+                                        </td>
+                                        <td>
+                                            <span className="badge" style={{ background: 'var(--accent-light)', color: 'var(--accent-color)' }}>
+                                                {s.group_name || 'No Group'}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span className="badge" style={{ background: 'var(--bg-color)', border: '1px solid var(--card-border)', color: 'var(--text-secondary)' }}>
+                                                {s.course}
+                                            </span>
+                                            <span className="text-sm text-secondary ml-2">{s.batch}</span>
+                                        </td>
+                                        <td>
+                                            {s.avgRating !== 'N/A' ? (
+                                                <span className="text-warning font-bold">⭐ {s.avgRating} <span className="text-secondary font-medium text-sm">({s.feedbackCount})</span></span>
+                                            ) : (
+                                                <span className="text-secondary text-sm">No review</span>
+                                            )}
+                                        </td>
+                                        <td className="text-right px-6" style={{ overflow: 'visible' }}>
+                                            <div className="flex justify-end gap-3" style={{ padding: '0.2rem', overflow: 'visible' }}>
+                                                <Link href={`/students/${s._id}`} className="btn btn-secondary px-3 py-1.5 text-xs" style={{ margin: '0 2px' }}>
+                                                    Profile
+                                                </Link>
+                                                {user?.role === 'admin' && (
+                                                    <Link href={`/students/${s._id}/edit`} className="btn btn-primary px-4 py-2 text-sm" style={{ background: 'var(--accent-color)', color: '#0b1326', boxShadow: '0 4px 12px var(--accent-glow)', margin: '0 2px' }}>
+                                                        Edit
+                                                    </Link>
+                                                )}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            ) : (
+                <div className="flex flex-col gap-8 py-4">
+                    {Object.entries(groupedData).sort().map(([groupName, groupStudents]) => (
+                        <div key={groupName} className="animate-fade-in">
+                            <div className="flex items-center gap-3 mb-4">
+                                <h4 className="text-xl font-bold m-0" style={{ color: 'var(--accent-color)' }}>{groupName}</h4>
+                                <span className="badge" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}>
+                                    {groupStudents.length} Students
+                                </span>
+                                <div style={{ flex: 1, height: '1px', background: 'linear-gradient(to right, var(--card-border), transparent)' }}></div>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {groupStudents.map(s => (
+                                    <div key={s._id} className="glass-card hover-glow transition-all" style={{ padding: '1rem', display: 'flex', gap: '1rem', alignItems: 'center' }}>
                                         {s.photo_url ? (
-                                            <img src={s.photo_url} alt="profile" style={{ width: '70px', height: '70px', borderRadius: 'var(--radius-md)', objectFit: 'cover', border: '2px solid var(--card-border)', boxShadow: '0 0 10px rgba(99,102,241,0.12)' }} />
+                                            <img src={s.photo_url} alt="profile" style={{ width: '60px', height: '60px', borderRadius: 'var(--radius-md)', objectFit: 'cover' }} />
                                         ) : (
-                                            <div style={{ width: '70px', height: '70px', borderRadius: 'var(--radius-md)', background: 'var(--accent-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '600', fontSize: '0.85rem', color: 'var(--accent-color)', border: '2px solid var(--card-border)' }}>
-                                                N/A
+                                            <div style={{ width: '60px', height: '60px', borderRadius: 'var(--radius-md)', background: 'var(--accent-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: 'var(--accent-color)' }}>
+                                                {s.name.charAt(0)}
                                             </div>
                                         )}
-                                    </td>
-                                    <td className="font-semibold">{s.student_id}</td>
-                                    <td className="font-medium text-primary">{s.name}</td>
-                                    <td>
-                                        {isDiscontinued ? (
-                                            <span className="badge" style={{ background: 'rgba(239,68,68,0.12)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)', whiteSpace: 'nowrap' }}>
-                                                🔴 Discontinued
-                                            </span>
-                                        ) : (
-                                            <span className="badge" style={{ background: 'rgba(16,185,129,0.12)', color: '#10b981', border: '1px solid rgba(16,185,129,0.3)', whiteSpace: 'nowrap' }}>
-                                                🟢 Active
-                                            </span>
-                                        )}
-                                    </td>
-                                    <td>
-                                        <span className="badge" style={{ background: 'var(--accent-light)', color: 'var(--accent-color)' }}>
-                                            {s.group_name || 'No Group'}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <span className="badge" style={{ background: 'var(--bg-color)', border: '1px solid var(--card-border)', color: 'var(--text-secondary)' }}>
-                                            {s.course}
-                                        </span>
-                                        <span className="text-sm text-secondary ml-2">{s.batch}</span>
-                                    </td>
-                                    <td>
-                                        {s.avgRating !== 'N/A' ? (
-                                            <span className="text-warning font-bold">⭐ {s.avgRating} <span className="text-secondary font-medium text-sm">({s.feedbackCount})</span></span>
-                                        ) : (
-                                            <span className="text-secondary text-sm">No review</span>
-                                        )}
-                                    </td>
-                                    <td className="text-right px-6" style={{ overflow: 'visible' }}>
-                                        <div className="flex justify-end gap-3" style={{ padding: '0.2rem', overflow: 'visible' }}>
-                                            <Link href={`/students/${s._id}`} className="btn btn-secondary px-3 py-1.5 text-xs" style={{ margin: '0 2px' }}>
-                                                Profile
-                                            </Link>
-                                            {user?.role === 'admin' && (
-                                                <Link href={`/students/${s._id}/edit`} className="btn btn-primary px-4 py-2 text-sm" style={{ background: 'var(--accent-color)', color: '#0b1326', boxShadow: '0 4px 12px var(--accent-glow)', margin: '0 2px' }}>
-                                                    Edit
+                                        <div style={{ flex: 1 }}>
+                                            <div className="font-bold text-sm truncate">{s.name}</div>
+                                            <div className="text-xs text-secondary mb-2">{s.student_id}</div>
+                                            <div className="flex justify-between items-center">
+                                                {s.avgRating !== 'N/A' ? (
+                                                    <span className="text-xs font-bold text-warning">⭐ {s.avgRating}</span>
+                                                ) : <span className="text-xs text-secondary opacity-50">No review</span>}
+                                                <Link href={`/students/${s._id}`} className="text-xs text-accent font-bold hover:underline">
+                                                    View Details →
                                                 </Link>
-                                            )}
+                                            </div>
                                         </div>
-                                    </td>
-                                </tr>
-                            );
-                        })}
-                        {filtered.length === 0 && (
-                            <tr><td colSpan="8" className="text-center p-8 text-secondary">No matching students found.</td></tr>
-                        )}
-                    </tbody>
-                </table>
-            </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {filtered.length === 0 && (
+                <div className="text-center p-12 text-secondary opacity-50">
+                    <div className="text-4xl mb-2">🔍</div>
+                    <p>No matching students found in this category.</p>
+                </div>
+            )}
         </div>
     );
 }

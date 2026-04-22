@@ -40,7 +40,7 @@ export default function LoginPage() {
                 <div className="login-header">
                     <img src="/logo.png" alt="EvalCore" className="login-logo" />
                     <h2 className="text-gradient">EvalCore</h2>
-                    <p className="text-secondary">Enterprise Student Evaluation</p>
+                    <p className="text-secondary">Student Evaluation System</p>
                 </div>
 
                 {error && (

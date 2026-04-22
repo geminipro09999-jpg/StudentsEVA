@@ -34,7 +34,8 @@ export default async function StudentProfilePage({ params }) {
 
     // Fetch related docs manually
     const { data: allUsers } = await supabase.from('users').select('id, name');
-    const { data: allLabs } = await supabase.from('lab_activities').select('id, name');
+    const { data: allLabs } = await supabase.from('lab_activities').select('id, name, subject_id');
+    const { data: allSubjects } = await supabase.from('subjects').select('id, name');
 
     // Fetch attendance records for this student
     const { data: attendanceRecords } = await supabase
@@ -45,12 +46,19 @@ export default async function StudentProfilePage({ params }) {
         .order('month', { ascending: false });
 
     const usersMap = (allUsers || []).reduce((acc, u) => { acc[u.id] = u; return acc; }, {});
-    const labsMap = (allLabs || []).reduce((acc, l) => { acc[l.id] = l; return acc; }, {});
+    const subjectsMap = (allSubjects || []).reduce((acc, s) => { acc[s.id] = s; return acc; }, {});
+    const labsMap = (allLabs || []).reduce((acc, l) => {
+        acc[l.id] = { ...l, subjectName: subjectsMap[l.subject_id]?.name };
+        return acc;
+    }, {});
 
     const feedbacks = (rawFeedbacks || []).map(f => ({
         ...f,
         users: { name: usersMap[f.lecturer_id]?.name || 'Unknown Lecturer' },
-        lab_activities: { name: labsMap[f.lab_activity_id]?.name || 'Unknown Lab' }
+        lab_activities: {
+            name: labsMap[f.lab_activity_id]?.name || 'Unknown Lab',
+            subjectName: labsMap[f.lab_activity_id]?.subjectName
+        }
     }));
 
     const validFeedbacks = feedbacks || [];
@@ -102,6 +110,18 @@ export default async function StudentProfilePage({ params }) {
                             <span>Group:</span>
                             <span className="badge" style={{ background: 'rgba(99,102,241,0.1)', color: 'var(--accent-color)' }}>{student.group_name || 'No Group'}</span>
                         </div>
+
+                        {(session.user.role === 'lecturer' || session.user.role === 'admin') && (
+                            <div className="w-full mt-6">
+                                <Link
+                                    href={`/feedback/add?studentId=${student.id}`}
+                                    className="btn btn-primary w-full animate-pulse-glow"
+                                    style={{ padding: '0.8rem' }}
+                                >
+                                    ✍️ Give Feedback
+                                </Link>
+                            </div>
+                        )}
                     </div>
 
                     <div className="glass-card mt-4 text-center">
@@ -204,7 +224,9 @@ export default async function StudentProfilePage({ params }) {
                                             <div>
                                                 <span className="badge" style={{ background: 'rgba(255,255,255,0.08)', marginRight: '0.5rem' }}>{f.category}</span>
                                                 {f.lab_activities?.name && (
-                                                    <span className="badge" style={{ background: 'rgba(99,102,241,0.1)', color: 'var(--accent-color)', marginRight: '0.5rem' }}>{f.lab_activities.name}</span>
+                                                    <span className="badge" style={{ background: 'rgba(99,102,241,0.1)', color: 'var(--accent-color)', marginRight: '0.5rem' }}>
+                                                        {f.lab_activities.subjectName ? `${f.lab_activities.subjectName}: ` : ''}{f.lab_activities.name}
+                                                    </span>
                                                 )}
                                                 <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>by {f.users?.name || 'Unknown'}</span>
                                             </div>

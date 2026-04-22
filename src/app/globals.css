@@ -15,9 +15,11 @@
 
   --card-bg: rgba(23, 31, 51, 0.4);
   --card-bg-solid: #171f33;
-  --card-border: rgba(187, 195, 255, 0.08);
+  --card-border: rgba(187, 195, 255, 0.12);
   /* Ghost Border */
-  --card-border-hover: rgba(187, 195, 255, 0.25);
+  --card-border-hover: rgba(187, 195, 255, 0.35);
+  --backdrop-blur: 20px;
+  --backdrop-blur-hover: 32px;
 
   --text-primary: #dae2fd;
   --text-secondary: #c5c5d9;
@@ -279,21 +281,37 @@ button,
   border-radius: var(--radius-xl);
   padding: 1.75rem;
   box-shadow: var(--shadow-md);
-  transition: var(--transition);
+  transition: var(--transition-spring);
   backdrop-filter: blur(var(--backdrop-blur));
   -webkit-backdrop-filter: blur(var(--backdrop-blur));
   position: relative;
   overflow: hidden;
+  transition: var(--transition-spring);
+}
+
+.glass-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent);
+  transition: 0.5s;
+}
+
+.glass-card:hover::after {
+  left: 100%;
 }
 
 /* Signature "Frost" Hover */
-.card-hover:hover {
-  transform: translateY(-4px);
+.hover-glow:hover {
+  transform: translateY(-5px) scale(1.01);
   background: rgba(23, 31, 51, 0.6);
   backdrop-filter: blur(var(--backdrop-blur-hover));
   -webkit-backdrop-filter: blur(var(--backdrop-blur-hover));
-  border-color: var(--card-border-hover);
-  box-shadow: var(--shadow-lg), var(--shadow-glow);
+  border-color: var(--accent-light);
+  box-shadow: var(--shadow-lg), 0 0 30px var(--accent-glow);
 }
 
 /* Stats Card Luminesence */
@@ -305,6 +323,7 @@ button,
   transition: var(--transition-spring);
   position: relative;
   overflow: hidden;
+  box-shadow: var(--shadow-sm);
 }
 
 .stat-card::before {
@@ -510,7 +529,7 @@ button,
   position: sticky;
   right: 0;
   z-index: 20;
-  background: #0b1326 !important;
+  background: var(--surface) !important;
   /* Solid background to prevent see-through on scroll */
   backdrop-filter: blur(24px) saturate(2);
   -webkit-backdrop-filter: blur(24px) saturate(2);

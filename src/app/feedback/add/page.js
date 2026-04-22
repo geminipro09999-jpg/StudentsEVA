@@ -4,11 +4,14 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { redirect } from "next/navigation";
 
-export default async function AddFeedbackPage() {
+export default async function AddFeedbackPage({ searchParams }) {
     const session = await getServerSession(authOptions);
     if (!session || !['lecturer', 'admin'].includes(session.user.role)) {
         redirect("/dashboard");
     }
+
+    const resolvedParams = await searchParams;
+    const studentId = resolvedParams?.studentId;
 
     const { data: students } = await supabase.from('students').select('*') || { data: [] };
     const { data: subjects } = await supabase.from('subjects').select('*').order('name') || { data: [] };
@@ -25,7 +28,13 @@ export default async function AddFeedbackPage() {
                 <h2>Add Student Feedback</h2>
                 <p style={{ color: 'var(--text-secondary)' }}>Provide constructive feedback and a rating for a student.</p>
             </div>
-            <AddFeedbackForm students={serializedStudents} initialSubjects={subjects || []} initialLabActivities={labActivities || []} userRole={session.user.role} />
+            <AddFeedbackForm
+                students={serializedStudents}
+                initialSubjects={subjects || []}
+                initialLabActivities={labActivities || []}
+                userRole={session.user.role}
+                initialStudentId={studentId}
+            />
         </div>
     );
 }

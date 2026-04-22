@@ -26,8 +26,10 @@ export default function LabsManager({ initialSubjects, initialActivities }) {
         const res = await addSubject(newSubjectName);
         if (res && res.data) {
             setSubjects([...subjects, res.data]);
+            setNewSubjectName("");
+        } else if (res && res.error) {
+            alert("Error: " + res.error);
         }
-        setNewSubjectName("");
         setLoading(false);
         router.refresh();
     };
@@ -39,8 +41,10 @@ export default function LabsManager({ initialSubjects, initialActivities }) {
         const res = await addLabActivity(newActivityName, selectedTargetSubject);
         if (res && res.data) {
             setActivities([...activities, res.data]);
+            setNewActivityName("");
+        } else if (res && res.error) {
+            alert("Error: " + res.error);
         }
-        setNewActivityName("");
         setLoading(false);
         router.refresh();
     };

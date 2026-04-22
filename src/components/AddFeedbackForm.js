@@ -13,13 +13,23 @@ const RATING_LABELS = [
     { value: 1, label: "Bad", color: "#ef4444", icon: "❌" }
 ];
 
-export default function AddFeedbackForm({ students, initialSubjects, initialLabActivities, userRole }) {
+export default function AddFeedbackForm({ students, initialSubjects, initialLabActivities, userRole, initialStudentId }) {
     const router = useRouter();
     const [loading, setLoading] = useState(false);
     const [rating, setRating] = useState(5); // Default to Excellent
 
     const [selectedSubject, setSelectedSubject] = useState("");
     const [selectedLabActivity, setSelectedLabActivity] = useState("");
+    const [studentSelection, setStudentSelection] = useState("");
+
+    useEffect(() => {
+        if (initialStudentId) {
+            const student = students.find(s => s.id === initialStudentId || s._id === initialStudentId);
+            if (student) {
+                setStudentSelection(`${student.name} - ${student.student_id}`);
+            }
+        }
+    }, [initialStudentId, students]);
 
     const filteredLabActivities = selectedSubject
         ? initialLabActivities.filter(l => l.subject_id === selectedSubject)
@@ -67,6 +77,8 @@ export default function AddFeedbackForm({ students, initialSubjects, initialLabA
                     <input
                         list="students_list"
                         name="student_selection"
+                        value={studentSelection}
+                        onChange={(e) => setStudentSelection(e.target.value)}
                         placeholder="Type to search student name or UT number..."
                         required
                         autoComplete="off"
