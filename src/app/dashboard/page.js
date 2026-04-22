@@ -16,6 +16,17 @@ export default async function Dashboard() {
         redirect("/login");
     }
 
+    // Role checks
+    const roles = session.user.roles || [session.user.role];
+    const isAdmin = roles.includes('admin');
+    const isLecturer = roles.includes('lecturer');
+    const isStaff = roles.includes('incubator_staff');
+
+    // If ONLY incubator staff, they don't have access to dashboard
+    if (isStaff && !isAdmin && !isLecturer) {
+        redirect("/timesheet/invoice");
+    }
+
     const { data: students } = await supabase.from('students').select('*') || { data: [] };
     const { data: feedbacks } = await supabase.from('feedbacks').select('*') || { data: [] };
     const { data: labActivities } = await supabase.from('lab_activities').select('*') || { data: [] };

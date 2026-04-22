@@ -11,23 +11,27 @@ export default function Navbar() {
     const pathname = usePathname();
     const { theme, setTheme } = useTheme();
     const [mounted, setMounted] = useState(false);
-    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
     useEffect(() => setMounted(true), []);
 
     if (!session) return null;
+
+    const roles = session.user.roles || [session.user.role];
+    const isPureStaff = roles.includes('incubator_staff') && roles.length === 1;
 
     return (
         <>
             <nav className="navbar animate-fade-in">
                 <div className="logo">
                     <img src="/logo.png" alt="EvalCore" style={{ height: '32px', width: 'auto' }} />
-                    <Link href="/dashboard">EvalCore</Link>
+                    <Link href={isPureStaff ? "/timesheet/invoice" : "/dashboard"}>EvalCore</Link>
                 </div>
 
                 {/* Desktop Primary Links */}
                 <div className="nav-links desktop-nav">
-                    <Link href="/dashboard" className={`nav-link ${pathname === '/dashboard' ? 'active' : ''}`}>Dashboard</Link>
+                    {!isPureStaff && (
+                        <Link href="/dashboard" className={`nav-link ${pathname === '/dashboard' ? 'active' : ''}`}>Dashboard</Link>
+                    )}
                     {session.user.role === 'admin' && (
                         <>
                             <Link href="/students/add" className={`nav-link ${pathname === '/students/add' ? 'active' : ''}`}>Add Student</Link>
@@ -38,20 +42,21 @@ export default function Navbar() {
                             <Link href="/reports" className={`nav-link ${pathname === '/reports' ? 'active' : ''}`}>Reports</Link>
                         </>
                     )}
-                    {(session.user.roles?.includes('lecturer') || session.user.role === 'lecturer') && (
+                    {(roles.includes('lecturer') || session.user.role === 'lecturer') && (
                         <>
                             <Link href="/feedback/add" className={`nav-link ${pathname === '/feedback/add' ? 'active' : ''}`}>Add Feedback</Link>
                             <Link href="/timesheet" className={`nav-link ${pathname === '/timesheet' ? 'active' : ''}`}>Timesheet</Link>
                         </>
                     )}
-                    {(session.user.roles?.includes('incubator_staff')) && (
+                    {roles.includes('incubator_staff') && (
                         <>
-                            <Link href="/timesheet/invoice" className={`nav-link ${pathname === '/timesheet/invoice' ? 'active' : ''}`}>Invoices</Link>
+                            <Link href="/timesheet/invoice" className={`nav-link ${pathname.includes('invoice') ? 'active' : ''}`}>Invoices</Link>
+                            <Link href="/profile" className={`nav-link ${pathname === '/profile' ? 'active' : ''}`}>Profile</Link>
                         </>
                     )}
                 </div>
 
-                {/* Actions (Both Desktop & Mobile) */}
+                {/* Actions */}
                 <div className="flex items-center gap-4">
                     <div className="nav-actions-desktop flex items-center gap-4">
                         {mounted && (
@@ -69,7 +74,7 @@ export default function Navbar() {
                             </button>
                         )}
                         <div className="flex gap-1">
-                            {(session.user.roles || [session.user.role]).map((r, i) => (
+                            {roles.map((r, i) => (
                                 <span key={i} className={`badge ${r === 'admin' ? 'badge-admin' : 'badge-lecturer'}`} style={{ fontSize: '0.6rem' }}>
                                     {r}
                                 </span>
@@ -98,44 +103,50 @@ export default function Navbar() {
 
             {/* Mobile Bottom Navigation */}
             <div className="bottom-nav">
-                <Link href="/dashboard" className={`bottom-nav-item ${pathname === '/dashboard' ? 'active' : ''}`}>
-                    <span className="icon">🏠</span>
-                    <span>Home</span>
-                </Link>
-
-                {session.user.role === 'admin' ? (
+                {isPureStaff ? (
                     <>
-                        <Link href="/students/add" className={`bottom-nav-item ${pathname === '/students/add' ? 'active' : ''}`}>
-                            <span className="icon">➕</span>
-                            <span>Add</span>
+                        <Link href="/timesheet/invoice" className={`bottom-nav-item ${pathname.includes('invoice') ? 'active' : ''}`}>
+                            <span className="icon">🧾</span>
+                            <span>Invoice</span>
                         </Link>
-                        <Link href="/attendance" className={`bottom-nav-item ${pathname === '/attendance' ? 'active' : ''}`}>
-                            <span className="icon">📅</span>
-                            <span>Attendance</span>
-                        </Link>
-                        <Link href="/timesheet" className={`bottom-nav-item ${pathname === '/timesheet' ? 'active' : ''}`}>
-                            <span className="icon">⏱️</span>
-                            <span>Times</span>
-                        </Link>
-                        <Link href="/labs-setup" className={`bottom-nav-item ${pathname === '/labs-setup' ? 'active' : ''}`}>
-                            <span className="icon">🧪</span>
-                            <span>Labs</span>
-                        </Link>
-                        <Link href="/reports" className={`bottom-nav-item ${pathname === '/reports' ? 'active' : ''}`}>
-                            <span className="icon">📊</span>
-                            <span>Reports</span>
+                        <Link href="/profile" className={`bottom-nav-item ${pathname === '/profile' ? 'active' : ''}`}>
+                            <span className="icon">👤</span>
+                            <span>Profile</span>
                         </Link>
                     </>
                 ) : (
                     <>
-                        <Link href="/feedback/add" className={`bottom-nav-item ${pathname === '/feedback/add' ? 'active' : ''}`}>
-                            <span className="icon">📝</span>
-                            <span>Feedback</span>
+                        <Link href="/dashboard" className={`bottom-nav-item ${pathname === '/dashboard' ? 'active' : ''}`}>
+                            <span className="icon">🏠</span>
+                            <span>Home</span>
                         </Link>
-                        <Link href="/timesheet" className={`bottom-nav-item ${pathname === '/timesheet' ? 'active' : ''}`}>
-                            <span className="icon">⏱️</span>
-                            <span>Times</span>
-                        </Link>
+                        {session.user.role === 'admin' ? (
+                            <>
+                                <Link href="/students/add" className={`bottom-nav-item ${pathname === '/students/add' ? 'active' : ''}`}>
+                                    <span className="icon">➕</span>
+                                    <span>Add</span>
+                                </Link>
+                                <Link href="/attendance" className={`bottom-nav-item ${pathname === '/attendance' ? 'active' : ''}`}>
+                                    <span className="icon">📅</span>
+                                    <span>Attendance</span>
+                                </Link>
+                                <Link href="/timesheet" className={`bottom-nav-item ${pathname === '/timesheet' ? 'active' : ''}`}>
+                                    <span className="icon">⏱️</span>
+                                    <span>Times</span>
+                                </Link>
+                            </>
+                        ) : (
+                            <>
+                                <Link href="/feedback/add" className={`bottom-nav-item ${pathname === '/feedback/add' ? 'active' : ''}`}>
+                                    <span className="icon">📝</span>
+                                    <span>Feedback</span>
+                                </Link>
+                                <Link href="/timesheet" className={`bottom-nav-item ${pathname === '/timesheet' ? 'active' : ''}`}>
+                                    <span className="icon">⏱️</span>
+                                    <span>Times</span>
+                                </Link>
+                            </>
+                        )}
                     </>
                 )}
             </div>
