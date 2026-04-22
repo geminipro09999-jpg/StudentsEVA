@@ -31,7 +31,18 @@ export const authOptions = {
                         throw new Error("Invalid password.");
                     }
 
-                    return { id: user.id, email: user.email, name: user.name, role: user.role };
+                    return {
+                        id: user.id,
+                        email: user.email,
+                        name: user.name,
+                        roles: user.roles || [user.role],
+                        address: user.address,
+                        phone: user.phone,
+                        account_name: user.account_name,
+                        bank_name: user.bank_name,
+                        account_no: user.account_no,
+                        branch: user.branch
+                    };
                 } catch (error) {
                     console.error("Auth error:", error);
                     throw error;
@@ -42,15 +53,22 @@ export const authOptions = {
     callbacks: {
         async jwt({ token, user }) {
             if (user) {
-                token.role = user.role;
+                token.roles = user.roles;
                 token.id = user.id;
+                token.address = user.address;
+                token.phone = user.phone;
             }
             return token;
         },
         async session({ session, token }) {
             if (token) {
-                session.user.role = token.role;
+                session.user.roles = token.roles;
                 session.user.id = token.id;
+                session.user.address = token.address;
+                session.user.phone = token.phone;
+
+                // Compatibility with old role check if needed
+                session.user.role = token.roles?.[0] || 'lecturer';
             }
             return session;
         }

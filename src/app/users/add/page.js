@@ -63,12 +63,22 @@ export default function AddUserPage() {
                         <label>Temporary Password</label>
                         <input type="password" name="password" placeholder="••••••••" required minLength="6" autoComplete="new-password" />
                     </div>
-                    <div>
-                        <label>Role</label>
-                        <select name="role" required>
-                            <option value="lecturer">Lecturer</option>
-                            <option value="admin">Administrator</option>
-                        </select>
+                    <div className="flex flex-col gap-2">
+                        <label>Roles</label>
+                        <div className="flex flex-wrap gap-4 p-3 rounded" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--card-border)' }}>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" name="roles" value="lecturer" defaultChecked />
+                                <span className="text-sm">Lecturer</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" name="roles" value="admin" />
+                                <span className="text-sm">Administrator</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" name="roles" value="incubator_staff" />
+                                <span className="text-sm">Incubator Staff</span>
+                            </label>
+                        </div>
                     </div>
 
                     <button type="submit" disabled={loading} className="btn btn-primary mt-2" style={{ padding: '1rem' }}>

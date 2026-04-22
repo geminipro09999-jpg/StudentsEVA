@@ -8,7 +8,11 @@ import bcrypt from "bcryptjs";
 export async function addUser(formData) {
     try {
         const session = await getServerSession(authOptions);
-        if (!session || session.user.role !== 'admin') {
+        const roles = formData.getAll("roles");
+        if (roles.length === 0) roles.push("lecturer"); // Default
+
+        const isAdmin = session.user.roles?.includes('admin') || session.user.role === 'admin';
+        if (!isAdmin) {
             throw new Error("Unauthorized: Only administrators can create users.");
         }
 
@@ -26,7 +30,8 @@ export async function addUser(formData) {
             name: formData.get("name"),
             email: email,
             password: hashedPassword,
-            role: formData.get("role")
+            role: roles[0], // For legacy support
+            roles: roles     // New multi-role support
         });
 
         if (error) {

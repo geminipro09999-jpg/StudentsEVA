@@ -76,13 +76,17 @@ export default function UsersPage() {
                                 <tr key={u.id}>
                                     <td style={{ fontWeight: '500' }}>{u.name}</td>
                                     <td>{u.email}</td>
-                                    <td>
-                                        <span className="badge" style={{
-                                            background: u.role === 'admin' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(34, 197, 94, 0.1)',
-                                            color: u.role === 'admin' ? 'var(--danger)' : 'var(--success)'
-                                        }}>
-                                            {u.role.toUpperCase()}
-                                        </span>
+                                    <td className="flex gap-1 flex-wrap">
+                                        {(u.roles || [u.role]).map((r, i) => (
+                                            <span key={i} className="badge" style={{
+                                                background: r === 'admin' ? 'rgba(239, 68, 68, 0.1)' : r === 'incubator_staff' ? 'rgba(99, 102, 241, 0.1)' : 'rgba(34, 197, 94, 0.1)',
+                                                color: r === 'admin' ? 'var(--danger)' : r === 'incubator_staff' ? 'var(--accent-color)' : 'var(--success)',
+                                                fontSize: '0.65rem',
+                                                padding: '0.2rem 0.5rem'
+                                            }}>
+                                                {r.toUpperCase().replace('_', ' ')}
+                                            </span>
+                                        ))}
                                     </td>
                                     <td style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                                         {new Date(u.created_at).toLocaleDateString()}

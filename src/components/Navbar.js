@@ -38,10 +38,15 @@ export default function Navbar() {
                             <Link href="/reports" className={`nav-link ${pathname === '/reports' ? 'active' : ''}`}>Reports</Link>
                         </>
                     )}
-                    {session.user.role === 'lecturer' && (
+                    {(session.user.roles?.includes('lecturer') || session.user.role === 'lecturer') && (
                         <>
                             <Link href="/feedback/add" className={`nav-link ${pathname === '/feedback/add' ? 'active' : ''}`}>Add Feedback</Link>
                             <Link href="/timesheet" className={`nav-link ${pathname === '/timesheet' ? 'active' : ''}`}>Timesheet</Link>
+                        </>
+                    )}
+                    {(session.user.roles?.includes('incubator_staff')) && (
+                        <>
+                            <Link href="/timesheet/invoice" className={`nav-link ${pathname === '/timesheet/invoice' ? 'active' : ''}`}>Invoices</Link>
                         </>
                     )}
                 </div>
@@ -49,6 +54,11 @@ export default function Navbar() {
                 {/* Actions (Both Desktop & Mobile) */}
                 <div className="flex items-center gap-4">
                     <div className="nav-actions-desktop flex items-center gap-4">
+                        {mounted && (
+                            <Link href="/profile" className="btn btn-secondary py-2 px-4" title="My Profile">
+                                👤 Profile
+                            </Link>
+                        )}
                         {mounted && (
                             <button
                                 onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
@@ -58,9 +68,13 @@ export default function Navbar() {
                                 {theme === 'dark' ? '☀️' : '🌙'}
                             </button>
                         )}
-                        <span className={`badge ${session.user.role === 'admin' ? 'badge-admin' : 'badge-lecturer'}`}>
-                            {session.user.role}
-                        </span>
+                        <div className="flex gap-1">
+                            {(session.user.roles || [session.user.role]).map((r, i) => (
+                                <span key={i} className={`badge ${r === 'admin' ? 'badge-admin' : 'badge-lecturer'}`} style={{ fontSize: '0.6rem' }}>
+                                    {r}
+                                </span>
+                            ))}
+                        </div>
                         <button onClick={() => signOut({ callbackUrl: '/login' })} className="btn btn-secondary py-2 px-4">
                             Logout
                         </button>

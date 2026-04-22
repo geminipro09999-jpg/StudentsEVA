@@ -8,11 +8,12 @@ const MONTH_NAMES = [
     'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
-export default function InvoiceGenerator({ entries, lecturers }) {
+export default function InvoiceGenerator({ entries, lecturers, currentUserId, isAdmin }) {
     const currentDate = new Date();
-    const [selectedLecturer, setSelectedLecturer] = useState('');
+    const [selectedLecturer, setSelectedLecturer] = useState(isAdmin ? '' : (currentUserId || ''));
     const [selectedMonth, setSelectedMonth] = useState(String(currentDate.getMonth() + 1));
     const [selectedYear, setSelectedYear] = useState(String(currentDate.getFullYear()));
+    const [deduction, setDeduction] = useState(0);
 
     const lecturerMap = useMemo(() => {
         const m = {};
@@ -20,9 +21,15 @@ export default function InvoiceGenerator({ entries, lecturers }) {
         return m;
     }, [lecturers]);
 
+    const lecturerInfo = lecturerMap[selectedLecturer];
+    const userRoles = lecturerInfo?.roles || [lecturerInfo?.role];
+    const isLecturerRole = userRoles.includes('lecturer');
+    const isStaffRole = userRoles.includes('incubator_staff');
+
     const filteredEntries = useMemo(() => {
         return (entries || []).filter(e => {
             if (e.status !== 'approved') return false;
+            // Only show entries for the selected person
             if (selectedLecturer && e.lecturer_id !== selectedLecturer) return false;
             const d = new Date(e.work_date);
             if (selectedMonth && (d.getMonth() + 1) !== Number(selectedMonth)) return false;
@@ -32,8 +39,14 @@ export default function InvoiceGenerator({ entries, lecturers }) {
     }, [entries, selectedLecturer, selectedMonth, selectedYear]);
 
     const totalHours = filteredEntries.reduce((s, e) => s + Number(e.hours), 0);
-    const lecturerInfo = lecturerMap[selectedLecturer];
-    const periodLabel = `${MONTH_NAMES[Number(selectedMonth)] || ''} ${selectedYear}`;
+    // Salary calculation (can be customized further)
+    const houlyRate = 2000; // Example rate
+    const grossTotal = totalHours * houlyRate;
+    const finalTotal = grossTotal - Number(deduction);
+
+    const monthName = MONTH_NAMES[Number(selectedMonth)] || '';
+    const periodLabel = `${monthName} ${selectedYear}`;
+    const invoiceNo = `${String(selectedMonth).padStart(2, '0')}${selectedYear.slice(-2)}001`; // Automatic No
 
     const availableYears = useMemo(() => {
         const years = [...new Set((entries || []).map(e => new Date(e.work_date).getFullYear()))].sort((a, b) => b - a);
@@ -43,114 +56,141 @@ export default function InvoiceGenerator({ entries, lecturers }) {
 
     async function exportPDF() {
         if (!selectedLecturer || filteredEntries.length === 0) {
-            toast.error("Select a lecturer with approved entries first");
+            toast.error("No approved records found for this period");
             return;
         }
         try {
-            // Import jsPDF
             const jspdfModule = await import('jspdf');
             const jsPDF = jspdfModule.default || jspdfModule.jsPDF;
-
-            // Import autoTable
             const autoTableModule = await import('jspdf-autotable');
             const autoTable = autoTableModule.default;
 
             const doc = new jsPDF();
 
-            // Header
-            doc.setFontSize(18);
+            // 1. Header
+            doc.setFontSize(28);
+            doc.setTextColor(51, 65, 85);
             doc.setFont('helvetica', 'bold');
-            doc.text('TIMESHEET INVOICE', 105, 20, { align: 'center' });
+            doc.text('INVOICE', 105, 30, { align: 'center' });
 
-            doc.setFontSize(10);
-            doc.setFont('helvetica', 'normal');
-            doc.text('Student Evaluation System — UnicomTIC', 105, 28, { align: 'center' });
-
-            doc.setDrawColor(99, 102, 241);
-            doc.setLineWidth(0.5);
-            doc.line(20, 32, 190, 32);
-
-            // Lecturer Info
+            // 2. Personal Info (Top Left)
             doc.setFontSize(11);
+            doc.setTextColor(0, 0, 0);
             doc.setFont('helvetica', 'bold');
-            doc.text('Lecturer:', 20, 42);
-            doc.setFont('helvetica', 'normal');
-            doc.text(lecturerInfo?.name || 'Unknown', 50, 42);
+            doc.text(lecturerInfo?.name || 'Name', 20, 50);
 
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(10);
+            doc.text([
+                lecturerInfo?.address || 'Address',
+                `Tel: ${lecturerInfo?.phone || 'Tel'}`,
+                `Email: ${lecturerInfo?.email || 'Email'}`
+            ], 20, 58);
+
+            // 3. Invoice Meta (Top Right)
             doc.setFont('helvetica', 'bold');
-            doc.text('Email:', 120, 42);
-            doc.setFont('helvetica', 'normal');
-            doc.text(lecturerInfo?.email || '—', 140, 42);
+            doc.text(`Invoice No :`, 140, 58);
+            doc.text(`Date :`, 140, 72);
 
+            doc.setFont('helvetica', 'normal');
+            doc.text(invoiceNo, 175, 58);
+            doc.text(new Date().toLocaleDateString(), 175, 72);
+
+            // 4. Client Info (Middle Left)
             doc.setFont('helvetica', 'bold');
-            doc.text('Period:', 20, 50);
+            doc.text('Unicom TIC', 20, 95);
             doc.setFont('helvetica', 'normal');
-            doc.text(periodLabel, 50, 50);
+            doc.text([
+                'unicomtic, MPCS Building,',
+                '127 kks road jaffna',
+                '',
+                'unicomtic@gmail.com'
+            ], 20, 102);
 
-            doc.setFont('helvetica', 'bold');
-            doc.text('Generated:', 120, 50);
-            doc.setFont('helvetica', 'normal');
-            doc.text(new Date().toLocaleDateString(), 150, 50);
+            // 5. Table Data (MATCH ROLE)
+            let head = [];
+            let body = [];
 
-            // Table
-            const tableData = filteredEntries.map((e, i) => [
-                i + 1,
-                new Date(e.work_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }),
-                e.in_time?.slice(0, 5),
-                e.out_time?.slice(0, 5),
-                Number(e.hours).toFixed(2),
-            ]);
-
-            tableData.push(['', '', '', 'TOTAL', totalHours.toFixed(2)]);
-
-            // Use the imported autoTable function directly
-            if (typeof autoTable === 'function') {
-                autoTable(doc, {
-                    startY: 58,
-                    head: [['#', 'Date', 'In Time', 'Out Time', 'Hours']],
-                    body: tableData,
-                    theme: 'grid',
-                    headStyles: { fillColor: [99, 102, 241], fontStyle: 'bold', fontSize: 9 },
-                    bodyStyles: { fontSize: 9 },
-                    columnStyles: { 0: { cellWidth: 12 }, 4: { fontStyle: 'bold', halign: 'center' } },
-                    didParseCell: function (data) {
-                        if (data.row.index === tableData.length - 1) {
-                            data.cell.styles.fontStyle = 'bold';
-                            data.cell.styles.fillColor = [240, 240, 255];
-                        }
-                    },
-                });
-            } else if (doc.autoTable) {
-                doc.autoTable({
-                    startY: 58,
-                    head: [['#', 'Date', 'In Time', 'Out Time', 'Hours']],
-                    body: tableData,
-                    theme: 'grid',
-                    headStyles: { fillColor: [99, 102, 241], fontStyle: 'bold', fontSize: 9 },
-                    bodyStyles: { fontSize: 9 },
-                    columnStyles: { 0: { cellWidth: 12 }, 4: { fontStyle: 'bold', halign: 'center' } },
-                });
+            if (isLecturerRole) {
+                head = [['Quantity', 'Description', 'Unit Price', 'Total - LKR']];
+                body = [[
+                    `${totalHours.toFixed(2)} Hrs`,
+                    `Consultation and development services for the month of ${monthName} ${selectedYear}`,
+                    houlyRate.toLocaleString(),
+                    grossTotal.toLocaleString()
+                ]];
             } else {
-                throw new Error("PDF Table plugin not loaded correctly");
+                head = [['Description', 'Total - LKR']];
+                body = [[
+                    `Consultation and development services for the month of ${monthName} ${selectedYear}`,
+                    grossTotal.toLocaleString()
+                ]];
             }
 
-            // Footer
-            const finalY = doc.lastAutoTable?.finalY || 200;
-            doc.setFontSize(9);
-            doc.setTextColor(100, 100, 100);
-            doc.text('This is a system-generated invoice from the Student Evaluation System.', 105, finalY + 10, { align: 'center' });
+            // 6. Draw Table
+            autoTable(doc, {
+                startY: 125,
+                head: head,
+                body: body,
+                theme: 'plain',
+                headStyles: {
+                    fillColor: [255, 255, 255],
+                    textColor: [0, 0, 0],
+                    fontStyle: 'bold',
+                    lineWidth: 0.5,
+                    lineColor: [0, 0, 0]
+                },
+                bodyStyles: {
+                    textColor: [0, 0, 0],
+                    lineWidth: 0.1,
+                    lineColor: [200, 200, 200]
+                },
+                columnStyles: isLecturerRole ? {
+                    0: { cellWidth: 30 },
+                    2: { cellWidth: 40, halign: 'right' },
+                    3: { cellWidth: 40, halign: 'right' }
+                } : {
+                    1: { cellWidth: 50, halign: 'right' }
+                }
+            });
 
-            // Signature lines
-            doc.setDrawColor(0, 0, 0);
-            doc.setLineWidth(0.3);
-            doc.line(25, finalY + 25, 85, finalY + 25);
-            doc.line(125, finalY + 25, 185, finalY + 25);
+            const finalY = doc.lastAutoTable.finalY + 10;
+
+            // 7. Bank Account Details (Bottom Left)
             doc.setFontSize(10);
-            doc.setTextColor(0, 0, 0);
-            doc.text('Lecturer Signature', 55, finalY + 32, { align: 'center' });
-            doc.text('Admin Signature', 155, finalY + 32, { align: 'center' });
+            doc.setFont('helvetica', 'bold');
+            doc.text('Bank Account Details', 20, finalY);
+            doc.setFont('helvetica', 'normal');
+            doc.text([
+                `Account Name: ${lecturerInfo?.account_name || '-'}`,
+                `Bank Name: ${lecturerInfo?.bank_name || '-'}`,
+                `Account No : ${lecturerInfo?.account_no || '-'}`,
+                `Branch : ${lecturerInfo?.branch || '-'}`
+            ], 20, finalY + 8);
 
-            doc.save(`Invoice_${lecturerInfo?.name?.replace(/\s+/g, '_') || 'lecturer'}_${periodLabel.replace(/\s+/g, '_')}.pdf`);
+            // 8. Totals (Bottom Right)
+            const rightColX = 140;
+            doc.text('Subtotal', rightColX, finalY);
+            doc.text('Tax', rightColX, finalY + 10);
+            doc.setFont('helvetica', 'bold');
+            doc.text('GROSS TOTAL', rightColX, finalY + 25);
+
+            // Total Value Box
+            doc.rect(165, finalY + 15, 30, 15);
+            doc.text(finalTotal.toLocaleString(), 180, finalY + 25, { align: 'center' });
+
+            if (deduction > 0) {
+                doc.setFontSize(8);
+                doc.setTextColor(239, 68, 68);
+                doc.text(`(Includes deduction: -${deduction.toLocaleString()})`, 180, finalY + 34, { align: 'center' });
+            }
+
+            // 9. Signature
+            doc.setTextColor(0, 0, 0);
+            doc.setFontSize(10);
+            doc.text('Signature', 20, finalY + 65);
+
+            doc.save(`Invoice_${lecturerInfo?.name?.[0] || 'staff'}_${monthName}_${selectedYear}.pdf`);
             toast.success('📄 PDF downloaded!');
         } catch (err) {
             console.error("PDF Gen Error:", err);
@@ -259,9 +299,14 @@ export default function InvoiceGenerator({ entries, lecturers }) {
             <div className="glass-card mb-4" style={{ padding: '1.25rem' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', alignItems: 'end' }}>
                     <div>
-                        <label>Lecturer *</label>
-                        <select value={selectedLecturer} onChange={e => setSelectedLecturer(e.target.value)} style={{ width: '100%' }}>
-                            <option value="">— Select Lecturer —</option>
+                        <label>Member Name *</label>
+                        <select
+                            value={selectedLecturer}
+                            onChange={e => setSelectedLecturer(e.target.value)}
+                            style={{ width: '100%' }}
+                            disabled={!isAdmin}
+                        >
+                            <option value="">— Select Member —</option>
                             {(lecturers || []).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
                         </select>
                     </div>
@@ -277,6 +322,17 @@ export default function InvoiceGenerator({ entries, lecturers }) {
                             {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
                         </select>
                     </div>
+                    {isStaffRole && (
+                        <div>
+                            <label>Deductions (LKR)</label>
+                            <input
+                                type="number"
+                                value={deduction}
+                                onChange={e => setDeduction(e.target.value)}
+                                placeholder="0.00"
+                            />
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -284,7 +340,7 @@ export default function InvoiceGenerator({ entries, lecturers }) {
             {!selectedLecturer ? (
                 <div className="glass-card text-center" style={{ padding: '3rem', color: 'var(--text-secondary)' }}>
                     <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>📋</div>
-                    <p>Select a lecturer to preview their invoice</p>
+                    <p>Select a member to preview their invoice</p>
                 </div>
             ) : filteredEntries.length === 0 ? (
                 <div className="glass-card text-center" style={{ padding: '3rem', color: 'var(--text-secondary)' }}>
@@ -292,56 +348,97 @@ export default function InvoiceGenerator({ entries, lecturers }) {
                     <p>No approved entries for {lecturerInfo?.name} in {periodLabel}</p>
                 </div>
             ) : (
-                <div className="glass-card animate-fade-in-scale" style={{ padding: '2.5rem' }}>
+                <div className="glass-card animate-fade-in-scale" style={{ padding: '2.5rem', maxWidth: '800px', margin: '0 auto', background: 'white', color: 'black' }}>
                     {/* Invoice Header */}
-                    <div className="text-center mb-8 pb-4 border-b-2 border-accent">
-                        <h2 className="text-3xl font-extrabold text-accent tracking-tight">TIMESHEET INVOICE</h2>
-                        <p className="text-secondary text-sm mt-1">Student Evaluation System — UnicomTIC and Innovation Center</p>
+                    <div className="text-center mb-8">
+                        <h2 className="text-4xl font-extrabold tracking-tight" style={{ color: '#334155' }}>INVOICE</h2>
                     </div>
 
-                    {/* Details */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-8 mb-8 p-4 rounded-xl bg-black/10 border border-card-border">
-                        <div className="flex gap-2"><strong>Lecturer:</strong> <span className="text-primary font-medium">{lecturerInfo?.name}</span></div>
-                        <div className="flex gap-2"><strong>Email:</strong> <span className="text-secondary">{lecturerInfo?.email || '—'}</span></div>
-                        <div className="flex gap-2"><strong>Period:</strong> <span className="text-primary font-medium">{periodLabel}</span></div>
-                        <div className="flex gap-2"><strong>Generated:</strong> <span className="text-secondary">{new Date().toLocaleDateString()}</span></div>
+                    {/* Details Row */}
+                    <div className="flex justify-between mb-12">
+                        <div>
+                            <h3 className="font-bold text-lg">{lecturerInfo?.name}</h3>
+                            <p className="text-sm opacity-70">{lecturerInfo?.address || 'Address not set'}</p>
+                            <p className="text-sm opacity-70">Tel: {lecturerInfo?.phone || '-'}</p>
+                            <p className="text-sm opacity-70">Email: {lecturerInfo?.email}</p>
+                        </div>
+                        <div className="text-right">
+                            <p className="text-sm"><strong>Invoice No :</strong> {invoiceNo}</p>
+                            <p className="text-sm"><strong>Date :</strong> {new Date().toLocaleDateString()}</p>
+                        </div>
+                    </div>
+
+                    {/* Client Info */}
+                    <div className="mb-8">
+                        <h4 className="font-bold">Unicom TIC</h4>
+                        <p className="text-sm opacity-70">unicomtic, MPCS Building,</p>
+                        <p className="text-sm opacity-70">127 kks road jaffna</p>
+                        <p className="text-sm opacity-70">unicomtic@gmail.com</p>
                     </div>
 
                     {/* Table */}
-                    <div className="table-container mb-8">
-                        <table className="data-table">
+                    <div className="border-t border-b border-black py-4 mb-4">
+                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                             <thead>
-                                <tr>
-                                    {['#', 'Date', 'In Time', 'Out Time', 'Hours'].map(h => (
-                                        <th key={h}>{h}</th>
-                                    ))}
+                                <tr style={{ borderBottom: '1px solid black' }}>
+                                    {isLecturerRole && <th style={{ textAlign: 'left', padding: '8px' }}>Quantity</th>}
+                                    <th style={{ textAlign: 'left', padding: '8px' }}>Description</th>
+                                    {isLecturerRole && <th style={{ textAlign: 'right', padding: '8px' }}>Unit Price</th>}
+                                    <th style={{ textAlign: 'right', padding: '8px' }}>Total - LKR</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {filteredEntries.map((e, i) => (
-                                    <tr key={e.id}>
-                                        <td className="text-secondary">{i + 1}</td>
-                                        <td className="font-medium">
-                                            {new Date(e.work_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
-                                        </td>
-                                        <td>{e.in_time?.slice(0, 5)}</td>
-                                        <td>{e.out_time?.slice(0, 5)}</td>
-                                        <td className="font-bold text-accent">{Number(e.hours).toFixed(2)}</td>
-                                    </tr>
-                                ))}
-                                <tr className="bg-accent-light font-bold" style={{ borderTop: '2px solid var(--accent-color)' }}>
-                                    <td colSpan="4" className="text-right py-4 text-base">TOTAL APPROVED HOURS</td>
-                                    <td className="text-lg text-accent py-4">{totalHours.toFixed(2)}</td>
+                                <tr>
+                                    {isLecturerRole && <td style={{ padding: '8px' }}>{totalHours.toFixed(2)} Hrs</td>}
+                                    <td style={{ padding: '8px' }}>
+                                        Consultation and development services for the month of {monthName} {selectedYear}
+                                    </td>
+                                    {isLecturerRole && <td style={{ textAlign: 'right', padding: '8px' }}>{houlyRate.toLocaleString()}</td>}
+                                    <td style={{ textAlign: 'right', padding: '8px' }}>{grossTotal.toLocaleString()}</td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
 
-                    {/* Export Buttons */}
-                    <div className="flex gap-4 justify-end wrap">
-                        <button onClick={exportWord} className="btn btn-secondary">
-                            📝 Export Word
-                        </button>
+                    {/* Lower Section */}
+                    <div className="flex justify-between gap-8">
+                        <div>
+                            <h4 className="font-bold text-sm mb-2">Bank Account Details</h4>
+                            <p className="text-xs">Account Name: {lecturerInfo?.account_name || '-'}</p>
+                            <p className="text-xs">Bank Name: {lecturerInfo?.bank_name || '-'}</p>
+                            <p className="text-xs">Account No: {lecturerInfo?.account_no || '-'}</p>
+                            <p className="text-xs">Branch: {lecturerInfo?.branch || '-'}</p>
+                        </div>
+                        <div style={{ minWidth: '200px' }}>
+                            <div className="flex justify-between py-1 text-sm border-b">
+                                <span>Subtotal</span>
+                                <span>{grossTotal.toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between py-1 text-sm border-b">
+                                <span>Tax</span>
+                                <span>0.00</span>
+                            </div>
+                            <div className="flex justify-between py-2 font-bold text-lg">
+                                <span>GROSS TOTAL</span>
+                                <span style={{ padding: '0.5rem', border: '1px solid black', minWidth: '100px', textAlign: 'right' }}>
+                                    {finalTotal.toLocaleString()}
+                                </span>
+                            </div>
+                            {deduction > 0 && (
+                                <p className="text-xs text-right text-red-500 italic mt-1">
+                                    Includes deduction: -{Number(deduction).toLocaleString()}
+                                </p>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Signature */}
+                    <div className="mt-16 pt-8 border-t border-transparent">
+                        <p className="font-bold">Signature</p>
+                    </div>
+
+                    {/* Real Export Buttons */}
+                    <div className="mt-8 pt-4 border-t border-gray-200 flex gap-4 justify-center" style={{ background: 'var(--bg-primary)', padding: '1rem', borderRadius: '1rem' }}>
                         <button onClick={exportPDF} className="btn btn-primary">
                             📄 Download PDF
                         </button>
