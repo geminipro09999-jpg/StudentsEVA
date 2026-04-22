@@ -67,8 +67,13 @@ export const authOptions = {
                 session.user.address = token.address;
                 session.user.phone = token.phone;
 
-                // Compatibility with old role check if needed
-                session.user.role = token.roles?.[0] || 'lecturer';
+                // Compatibility with old role check
+                // Prefer 'admin' if present, otherwise first role, default to 'lecturer'
+                if (token.roles?.includes('admin')) {
+                    session.user.role = 'admin';
+                } else {
+                    session.user.role = token.roles?.[0] || 'lecturer';
+                }
             }
             return session;
         }

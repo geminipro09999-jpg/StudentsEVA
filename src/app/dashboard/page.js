@@ -98,7 +98,7 @@ export default async function Dashboard() {
                     </div>
                 </div>
 
-                {session.user.role === 'admin' ? (
+                {roles.includes('admin') ? (
                     <div className="stat-card warning animate-fade-in-scale stagger-4">
                         <div className="flex justify-between items-start mb-6">
                             <div>

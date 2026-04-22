@@ -32,7 +32,7 @@ export default function Navbar() {
                     {!isPureStaff && (
                         <Link href="/dashboard" className={`nav-link ${pathname === '/dashboard' ? 'active' : ''}`}>Dashboard</Link>
                     )}
-                    {session.user.role === 'admin' && (
+                    {roles.includes('admin') && (
                         <>
                             <Link href="/students/add" className={`nav-link ${pathname === '/students/add' ? 'active' : ''}`}>Add Student</Link>
                             <Link href="/attendance" className={`nav-link ${pathname === '/attendance' ? 'active' : ''}`}>Attendance</Link>
@@ -120,7 +120,7 @@ export default function Navbar() {
                             <span className="icon">🏠</span>
                             <span>Home</span>
                         </Link>
-                        {session.user.role === 'admin' ? (
+                        {roles.includes('admin') ? (
                             <>
                                 <Link href="/students/add" className={`bottom-nav-item ${pathname === '/students/add' ? 'active' : ''}`}>
                                     <span className="icon">➕</span>
