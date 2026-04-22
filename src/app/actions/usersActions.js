@@ -14,7 +14,7 @@ export async function getUsers() {
 
         const { data, error } = await supabase
             .from('users')
-            .select('id, name, email, role, created_at')
+            .select('id, name, email, role, roles, created_at')
             .order('name');
 
         if (error) throw error;
@@ -43,6 +43,35 @@ export async function changeUserPassword(formData) {
         const { error } = await supabase
             .from('users')
             .update({ password: hashedPassword })
+            .eq('id', userId);
+
+        if (error) throw error;
+
+        revalidatePath("/users");
+        return { success: true };
+    } catch (error) {
+        return { error: error.message };
+    }
+}
+
+export async function updateUserRoles(userId, roles) {
+    try {
+        const session = await getServerSession(authOptions);
+        const isAdmin = session?.user?.roles?.includes('admin') || session?.user?.role === 'admin';
+        if (!session || !isAdmin) {
+            throw new Error("Unauthorized");
+        }
+
+        if (!roles || !Array.isArray(roles) || roles.length === 0) {
+            throw new Error("At least one role is required.");
+        }
+
+        const { error } = await supabase
+            .from('users')
+            .update({
+                roles: roles,
+                role: roles[0]
+            })
             .eq('id', userId);
 
         if (error) throw error;

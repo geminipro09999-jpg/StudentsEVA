@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { getUsers } from "@/app/actions/usersActions";
 import ChangePasswordModal from "@/components/ChangePasswordModal";
+import EditRolesModal from "@/components/EditRolesModal";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
@@ -11,6 +12,7 @@ export default function UsersPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [selectedUser, setSelectedUser] = useState(null);
+    const [editingRolesUser, setEditingRolesUser] = useState(null);
     const { data: session, status } = useSession();
     const router = useRouter();
 
@@ -91,13 +93,20 @@ export default function UsersPage() {
                                     <td style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                                         {new Date(u.created_at).toLocaleDateString()}
                                     </td>
-                                    <td>
+                                    <td className="flex gap-2">
                                         <button
                                             onClick={() => setSelectedUser(u)}
-                                            className="btn btn-primary"
-                                            style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', background: 'rgba(99,102,241,0.2)', color: 'var(--accent-color)', border: '1px solid var(--accent-color)' }}
+                                            className="btn btn-secondary"
+                                            style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem' }}
                                         >
-                                            Change Password
+                                            Reset PW
+                                        </button>
+                                        <button
+                                            onClick={() => setEditingRolesUser(u)}
+                                            className="btn btn-primary"
+                                            style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem', background: 'rgba(99,102,241,0.2)', color: 'var(--accent-color)', border: '1px solid var(--accent-color)' }}
+                                        >
+                                            Edit Roles
                                         </button>
                                     </td>
                                 </tr>
@@ -112,6 +121,16 @@ export default function UsersPage() {
                     user={selectedUser}
                     onClose={() => {
                         setSelectedUser(null);
+                        fetchUsers();
+                    }}
+                />
+            )}
+
+            {editingRolesUser && (
+                <EditRolesModal
+                    user={editingRolesUser}
+                    onClose={() => {
+                        setEditingRolesUser(null);
                         fetchUsers();
                     }}
                 />
