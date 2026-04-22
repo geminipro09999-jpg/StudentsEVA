@@ -8,18 +8,32 @@ import bcrypt from "bcryptjs";
 export async function getUsers() {
     try {
         const session = await getServerSession(authOptions);
-        if (!session || session.user.role !== 'admin') {
+        const isAdmin = session?.user?.roles?.includes('admin') || session?.user?.role === 'admin';
+
+        if (!session || !isAdmin) {
             throw new Error("Unauthorized");
         }
 
+        // Try to select both role and roles. If roles column doesn't exist yet, fallback to just role.
         const { data, error } = await supabase
             .from('users')
             .select('id, name, email, role, roles, created_at')
             .order('name');
 
-        if (error) throw error;
+        if (error) {
+            // Fallback for if the roles column is not in the DB yet
+            const { data: fallbackData, error: fallbackError } = await supabase
+                .from('users')
+                .select('id, name, email, role, created_at')
+                .order('name');
+
+            if (fallbackError) throw fallbackError;
+            return { data: fallbackData };
+        }
+
         return { data };
     } catch (error) {
+        console.error("getUsers error:", error);
         return { error: error.message };
     }
 }
@@ -27,7 +41,9 @@ export async function getUsers() {
 export async function changeUserPassword(formData) {
     try {
         const session = await getServerSession(authOptions);
-        if (!session || session.user.role !== 'admin') {
+        const isAdmin = session?.user?.roles?.includes('admin') || session?.user?.role === 'admin';
+
+        if (!session || !isAdmin) {
             throw new Error("Unauthorized");
         }
 
@@ -58,6 +74,7 @@ export async function updateUserRoles(userId, roles) {
     try {
         const session = await getServerSession(authOptions);
         const isAdmin = session?.user?.roles?.includes('admin') || session?.user?.role === 'admin';
+
         if (!session || !isAdmin) {
             throw new Error("Unauthorized");
         }
@@ -66,15 +83,26 @@ export async function updateUserRoles(userId, roles) {
             throw new Error("At least one role is required.");
         }
 
+        // Prepare update data. We update both for compatibility.
+        const updateData = {
+            roles: roles,
+            role: roles[0]
+        };
+
         const { error } = await supabase
             .from('users')
-            .update({
-                roles: roles,
-                role: roles[0]
-            })
+            .update(updateData)
             .eq('id', userId);
 
-        if (error) throw error;
+        if (error) {
+            // If roles column doesn't exist, try just updating 'role'
+            const { error: fallbackError } = await supabase
+                .from('users')
+                .update({ role: roles[0] })
+                .eq('id', userId);
+
+            if (fallbackError) throw fallbackError;
+        }
 
         revalidatePath("/users");
         return { success: true };

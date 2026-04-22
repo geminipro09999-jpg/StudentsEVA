@@ -18,7 +18,8 @@ export default function UsersPage() {
 
     useEffect(() => {
         if (status === "loading") return;
-        if (!session || session.user.role !== 'admin') {
+        const isAdmin = session?.user?.roles?.includes('admin') || session?.user?.role === 'admin';
+        if (!session || !isAdmin) {
             router.push("/dashboard");
             return;
         }
