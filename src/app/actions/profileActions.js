@@ -10,6 +10,7 @@ export async function updateProfile(userId, data) {
         .update({
             address: data.address,
             phone: data.phone,
+            staff_email: data.staff_email,
             account_name: data.account_name,
             bank_name: data.bank_name,
             account_no: data.account_no,

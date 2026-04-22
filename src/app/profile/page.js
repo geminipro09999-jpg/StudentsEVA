@@ -11,6 +11,7 @@ export default function ProfilePage() {
     const [formData, setFormData] = useState({
         address: "",
         phone: "",
+        staff_email: "",
         account_name: "",
         bank_name: "",
         account_no: "",
@@ -29,6 +30,7 @@ export default function ProfilePage() {
             setFormData({
                 address: res.data.address || "",
                 phone: res.data.phone || "",
+                staff_email: res.data.staff_email || "",
                 account_name: res.data.account_name || "",
                 bank_name: res.data.bank_name || "",
                 account_no: res.data.account_no || "",
@@ -50,7 +52,8 @@ export default function ProfilePage() {
             // Update session if needed
             update({
                 address: formData.address,
-                phone: formData.phone
+                phone: formData.phone,
+                staff_email: formData.staff_email
             });
         } else {
             toast.error(res.error || "Failed to update profile");
@@ -77,8 +80,22 @@ export default function ProfilePage() {
                                 <input type="text" value={session.user.name} disabled className="opacity-50" />
                             </div>
                             <div>
-                                <label>Email Address</label>
+                                <label>Login Email (Read-only)</label>
                                 <input type="text" value={session.user.email} disabled className="opacity-50" />
+                            </div>
+                            <div className="accent-group" style={{ padding: '1rem', background: 'rgba(99, 102, 241, 0.03)', borderRadius: '0.8rem', borderLeft: '4px solid var(--accent-color)' }}>
+                                <label style={{ color: 'var(--accent-color)', fontWeight: '600' }}>Official Email (for Invoices)</label>
+                                <input
+                                    type="email"
+                                    name="staff_email"
+                                    value={formData.staff_email}
+                                    onChange={handleChange}
+                                    placeholder="your-staff-id@unicomtic.com"
+                                    style={{ background: 'var(--card-bg)' }}
+                                />
+                                <small className="text-secondary" style={{ fontSize: '0.75rem', marginTop: '0.5rem', display: 'block' }}>
+                                    This email will appear on your generated invoices instead of your login email.
+                                </small>
                             </div>
                             <div>
                                 <label>Phone Number</label>

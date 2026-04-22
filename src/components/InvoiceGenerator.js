@@ -84,7 +84,7 @@ export default function InvoiceGenerator({ entries, lecturers, currentUserId, is
             doc.text([
                 lecturerInfo?.address || 'Address',
                 `Tel: ${lecturerInfo?.phone || 'Tel'}`,
-                `Email: ${lecturerInfo?.email || 'Email'}`
+                `Email: ${lecturerInfo?.staff_email || lecturerInfo?.email || 'Email'}`
             ], 20, 58);
 
             // 3. Invoice Meta (Top Right)
