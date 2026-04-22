@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import toast from "react-hot-toast";
+import { submitInvoice } from "@/app/actions/invoiceActions";
 
 const MONTH_NAMES = [
     '', 'January', 'February', 'March', 'April', 'May', 'June',
@@ -14,6 +15,7 @@ export default function InvoiceGenerator({ entries, lecturers, currentUserId, is
     const [selectedMonth, setSelectedMonth] = useState(String(currentDate.getMonth() + 1));
     const [selectedYear, setSelectedYear] = useState(String(currentDate.getFullYear()));
     const [deduction, setDeduction] = useState(0);
+    const [submissionStatus, setSubmissionStatus] = useState(null);
 
     const lecturerMap = useMemo(() => {
         const m = {};
@@ -53,6 +55,30 @@ export default function InvoiceGenerator({ entries, lecturers, currentUserId, is
         if (years.length === 0) years.push(currentDate.getFullYear());
         return years;
     }, [entries]);
+
+    const handleSubmitInvoice = async () => {
+        setSubmissionLoading(true);
+        const res = await submitInvoice({
+            invoice_no: invoiceNo,
+            month: monthName,
+            year: selectedYear,
+            amount: finalTotal,
+            deductions: deduction,
+            houlyRate,
+            totalHours,
+            items: filteredEntries,
+            lecturerName: lecturerInfo?.name,
+            lecturerEmail: lecturerInfo?.staff_email || lecturerInfo?.email
+        });
+
+        if (res.success) {
+            toast.success("Invoice submitted for approval!");
+            setIsSubmitted(true);
+        } else {
+            toast.error(res.error || "Failed to submit invoice");
+        }
+        setSubmissionLoading(false);
+    };
 
     async function exportPDF() {
         if (!selectedLecturer || filteredEntries.length === 0) {
@@ -438,10 +464,31 @@ export default function InvoiceGenerator({ entries, lecturers, currentUserId, is
                     </div>
 
                     {/* Real Export Buttons */}
-                    <div className="mt-8 pt-4 border-t border-gray-200 flex gap-4 justify-center" style={{ background: 'var(--bg-primary)', padding: '1rem', borderRadius: '1rem' }}>
-                        <button onClick={exportPDF} className="btn btn-primary">
-                            📄 Download PDF
-                        </button>
+                    <div className="mt-8 pt-4 border-t border-gray-200 flex flex-col items-center gap-4" style={{ background: 'var(--bg-primary)', padding: '1.5rem', borderRadius: '1rem' }}>
+                        <div className="flex gap-4 justify-center">
+                            <button onClick={exportPDF} className="btn btn-secondary">
+                                📄 Download Draft PDF
+                            </button>
+                            {!isSubmitted ? (
+                                <button
+                                    onClick={handleSubmitInvoice}
+                                    disabled={submissionLoading}
+                                    className="btn btn-primary"
+                                    style={{ background: 'var(--accent-color)' }}
+                                >
+                                    {submissionLoading ? "Submitting..." : "📤 Submit for Approval"}
+                                </button>
+                            ) : (
+                                <div className="flex items-center gap-2 text-success font-bold px-6 py-2 rounded-full border-2 border-success bg-success/5 animate-fade-in">
+                                    <span>✅ Submitted</span>
+                                </div>
+                            )}
+                        </div>
+                        {isSubmitted && (
+                            <p className="text-xs text-secondary italic">
+                                Your invoice is now pending review by the Administrator. You can still download the draft.
+                            </p>
+                        )}
                     </div>
                 </div>
             )}

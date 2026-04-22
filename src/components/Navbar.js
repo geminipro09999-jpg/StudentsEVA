@@ -41,6 +41,7 @@ export default function Navbar() {
                             <Link href="/labs-setup" className={`nav-link ${pathname === '/labs-setup' ? 'active' : ''}`}>Labs</Link>
                             <Link href="/users" className={`nav-link ${pathname === '/users' ? 'active' : ''}`}>Users</Link>
                             <Link href="/reports" className={`nav-link ${pathname === '/reports' ? 'active' : ''}`}>Reports</Link>
+                            <Link href="/timesheet/admin/invoices" className={`nav-link ${pathname === '/timesheet/admin/invoices' ? 'active' : ''}`}>Review Invoices</Link>
                         </>
                     )}
                     {(roles.includes('lecturer') || session.user.role === 'lecturer') && (
