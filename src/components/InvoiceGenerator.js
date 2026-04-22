@@ -9,13 +9,17 @@ const MONTH_NAMES = [
     'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
-export default function InvoiceGenerator({ entries, lecturers, currentUserId, isAdmin }) {
+export default function InvoiceGenerator({ entries, lecturers, currentUserId, isAdmin: initialIsAdmin }) {
+    const { data: session } = useSession();
     const currentDate = new Date();
-    const [selectedLecturer, setSelectedLecturer] = useState(isAdmin ? '' : (currentUserId || ''));
+    const [selectedLecturer, setSelectedLecturer] = useState(initialIsAdmin ? '' : (currentUserId || ''));
     const [selectedMonth, setSelectedMonth] = useState(String(currentDate.getMonth() + 1));
     const [selectedYear, setSelectedYear] = useState(String(currentDate.getFullYear()));
     const [deduction, setDeduction] = useState(0);
+    const [manualAmount, setManualAmount] = useState(0);
     const [submissionStatus, setSubmissionStatus] = useState(null);
+    const [submissionLoading, setSubmissionLoading] = useState(false);
+    const [isSubmitted, setIsSubmitted] = useState(false);
 
     const lecturerMap = useMemo(() => {
         const m = {};
@@ -24,9 +28,13 @@ export default function InvoiceGenerator({ entries, lecturers, currentUserId, is
     }, [lecturers]);
 
     const lecturerInfo = lecturerMap[selectedLecturer];
-    const userRoles = lecturerInfo?.roles || [lecturerInfo?.role];
+    const userRoles = lecturerInfo?.roles || [lecturerInfo?.role] || [];
     const isLecturerRole = userRoles.includes('lecturer');
     const isStaffRole = userRoles.includes('incubator_staff');
+    const isAdminAccount = userRoles.some(r => ['admin', 'administrator'].includes(r));
+
+    // Pure staff mode = has staff role but NOT lecturer and NOT admin
+    const isPureStaffRole = isStaffRole && !isLecturerRole && !isAdminAccount;
 
     const filteredEntries = useMemo(() => {
         return (entries || []).filter(e => {
@@ -41,9 +49,13 @@ export default function InvoiceGenerator({ entries, lecturers, currentUserId, is
     }, [entries, selectedLecturer, selectedMonth, selectedYear]);
 
     const totalHours = filteredEntries.reduce((s, e) => s + Number(e.hours), 0);
-    // Salary calculation (can be customized further)
-    const houlyRate = 2000; // Example rate
-    const grossTotal = totalHours * houlyRate;
+
+    // Salary calculation
+    const houlyRate = 3000;
+    const calculatedGross = totalHours * houlyRate;
+
+    // Use manual salary for pure staff, otherwise use calculated total
+    const grossTotal = isPureStaffRole ? Number(manualAmount) : calculatedGross;
     const finalTotal = grossTotal - Number(deduction);
 
     const monthName = MONTH_NAMES[Number(selectedMonth)] || '';
@@ -81,8 +93,8 @@ export default function InvoiceGenerator({ entries, lecturers, currentUserId, is
     };
 
     async function exportPDF() {
-        if (!selectedLecturer || filteredEntries.length === 0) {
-            toast.error("No approved records found for this period");
+        if (!selectedLecturer || (!isPureStaffRole && filteredEntries.length === 0)) {
+            toast.error(isPureStaffRole ? "Select a staff member first" : "No approved records found for this period");
             return;
         }
         try {
@@ -137,7 +149,7 @@ export default function InvoiceGenerator({ entries, lecturers, currentUserId, is
             let head = [];
             let body = [];
 
-            if (isLecturerRole) {
+            if (!isPureStaffRole) {
                 head = [['Quantity', 'Description', 'Unit Price', 'Total - LKR']];
                 body = [[
                     `${totalHours.toFixed(2)} Hrs`,
@@ -148,7 +160,7 @@ export default function InvoiceGenerator({ entries, lecturers, currentUserId, is
             } else {
                 head = [['Description', 'Total - LKR']];
                 body = [[
-                    `Consultation and development services for the month of ${monthName} ${selectedYear}`,
+                    `Professional service fees for the month of ${monthName} ${selectedYear}`,
                     grossTotal.toLocaleString()
                 ]];
             }
@@ -171,7 +183,7 @@ export default function InvoiceGenerator({ entries, lecturers, currentUserId, is
                     lineWidth: 0.1,
                     lineColor: [200, 200, 200]
                 },
-                columnStyles: isLecturerRole ? {
+                columnStyles: !isPureStaffRole ? {
                     0: { cellWidth: 30 },
                     2: { cellWidth: 40, halign: 'right' },
                     3: { cellWidth: 40, halign: 'right' }
@@ -382,6 +394,19 @@ export default function InvoiceGenerator({ entries, lecturers, currentUserId, is
 
                     {/* Details Row */}
                     <div className="flex justify-between mb-12">
+                        {isPureStaffRole && (
+                            <div>
+                                <label className="block text-xs font-bold mb-1 opacity-70">Monthly Salary (LKR)</label>
+                                <input
+                                    type="number"
+                                    value={manualAmount}
+                                    onChange={(e) => setManualAmount(e.target.value)}
+                                    className="btn btn-secondary w-full text-left"
+                                    placeholder="Enter Amount"
+                                    style={{ background: 'white', color: 'black', border: '1px solid #ddd' }}
+                                />
+                            </div>
+                        )}
                         <div>
                             <h3 className="font-bold text-lg">{lecturerInfo?.name}</h3>
                             <p className="text-sm opacity-70">{lecturerInfo?.address || 'Address not set'}</p>
@@ -407,19 +432,19 @@ export default function InvoiceGenerator({ entries, lecturers, currentUserId, is
                         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                             <thead>
                                 <tr style={{ borderBottom: '1px solid black' }}>
-                                    {isLecturerRole && <th style={{ textAlign: 'left', padding: '8px' }}>Quantity</th>}
+                                    {!isPureStaffRole && <th style={{ textAlign: 'left', padding: '8px' }}>Quantity</th>}
                                     <th style={{ textAlign: 'left', padding: '8px' }}>Description</th>
-                                    {isLecturerRole && <th style={{ textAlign: 'right', padding: '8px' }}>Unit Price</th>}
+                                    {!isPureStaffRole && <th style={{ textAlign: 'right', padding: '8px' }}>Unit Price</th>}
                                     <th style={{ textAlign: 'right', padding: '8px' }}>Total - LKR</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <tr>
-                                    {isLecturerRole && <td style={{ padding: '8px' }}>{totalHours.toFixed(2)} Hrs</td>}
+                                    {!isPureStaffRole && <td style={{ padding: '8px' }}>{totalHours.toFixed(2)} Hrs</td>}
                                     <td style={{ padding: '8px' }}>
                                         Consultation and development services for the month of {monthName} {selectedYear}
                                     </td>
-                                    {isLecturerRole && <td style={{ textAlign: 'right', padding: '8px' }}>{houlyRate.toLocaleString()}</td>}
+                                    {!isPureStaffRole && <td style={{ textAlign: 'right', padding: '8px' }}>{houlyRate.toLocaleString()}</td>}
                                     <td style={{ textAlign: 'right', padding: '8px' }}>{grossTotal.toLocaleString()}</td>
                                 </tr>
                             </tbody>

@@ -136,6 +136,10 @@ export default function Navbar() {
                                     <span className="icon">⏱️</span>
                                     <span>Times</span>
                                 </Link>
+                                <Link href="/timesheet/admin/invoices" className={`bottom-nav-item ${pathname === '/timesheet/admin/invoices' ? 'active' : ''}`}>
+                                    <span className="icon">🧾</span>
+                                    <span>Review</span>
+                                </Link>
                             </>
                         ) : (
                             <>
