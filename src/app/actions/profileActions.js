@@ -14,7 +14,8 @@ export async function updateProfile(userId, data) {
             account_name: data.account_name,
             bank_name: data.bank_name,
             account_no: data.account_no,
-            branch: data.branch
+            branch: data.branch,
+            e_signature: data.e_signature
         })
         .eq('id', userId);
 

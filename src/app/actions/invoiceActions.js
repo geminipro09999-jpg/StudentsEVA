@@ -50,6 +50,7 @@ export async function approveInvoice(invoiceId, update) {
             .from('invoices')
             .update({
                 status: update.status,
+                amount: update.amount,
                 deductions: update.deductions || 0,
                 updated_at: new Date()
             })
@@ -79,7 +80,7 @@ export async function getAllInvoices() {
 
         const { data, error } = await supabase
             .from('invoices')
-            .select('*, users(name, email, staff_email)')
+            .select('*, users(name, email, staff_email, address, phone, account_name, bank_name, account_no, branch, e_signature)')
             .order('created_at', { ascending: false });
 
         if (error) throw error;

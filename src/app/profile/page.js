@@ -15,7 +15,8 @@ export default function ProfilePage() {
         account_name: "",
         bank_name: "",
         account_no: "",
-        branch: ""
+        branch: "",
+        e_signature: ""
     });
 
     useEffect(() => {
@@ -34,7 +35,8 @@ export default function ProfilePage() {
                 account_name: res.data.account_name || "",
                 bank_name: res.data.bank_name || "",
                 account_no: res.data.account_no || "",
-                branch: res.data.branch || ""
+                branch: res.data.branch || "",
+                e_signature: res.data.e_signature || ""
             });
         }
     }
@@ -131,6 +133,61 @@ export default function ProfilePage() {
                         <div>
                             <label>Branch</label>
                             <input type="text" name="branch" value={formData.branch} onChange={handleChange} placeholder="e.g. Jaffna Main Branch" />
+                        </div>
+                    </div>
+                </div>
+
+                <div className="glass-card mt-6">
+                    <h3 className="text-xl font-bold mb-6 text-accent">🖋️ Digital Signature</h3>
+                    <p className="text-sm text-secondary mb-4">
+                        Upload your e-signature image. This will be automatically added to your submitted invoices.
+                    </p>
+
+                    <div className="flex flex-col gap-4 items-center">
+                        {formData.e_signature ? (
+                            <div className="signature-preview-container mb-4">
+                                <img
+                                    src={formData.e_signature}
+                                    alt="Signature Preview"
+                                    style={{ maxHeight: '80px', border: '1px dashed var(--accent-light)', padding: '10px', background: 'white' }}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setFormData(p => ({ ...p, e_signature: "" }))}
+                                    className="text-xs text-red-500 mt-2 block mx-auto underline"
+                                >
+                                    Remove Signature
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="text-center p-8 border-2 border-dashed border-gray-400 rounded-xl w-full">
+                                <span className="text-4xl">🖋️</span>
+                                <p className="text-sm mt-2">No signature uploaded</p>
+                            </div>
+                        )}
+
+                        <div className="w-full">
+                            <label className="btn btn-secondary w-full cursor-pointer text-center">
+                                {formData.e_signature ? "🔄 Change Signature" : "📤 Upload Signature Image"}
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={async (e) => {
+                                        const file = e.target.files[0];
+                                        if (file) {
+                                            const reader = new FileReader();
+                                            reader.onloadend = () => {
+                                                setFormData(p => ({ ...p, e_signature: reader.result }));
+                                            };
+                                            reader.readAsDataURL(file);
+                                        }
+                                    }}
+                                />
+                            </label>
+                            <small className="text-xs text-secondary mt-2 block text-center">
+                                Recommended size: 300x100px (PNG/JPG)
+                            </small>
                         </div>
                     </div>
                 </div>

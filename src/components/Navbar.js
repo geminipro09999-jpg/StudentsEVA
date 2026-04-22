@@ -3,13 +3,13 @@
 import Link from "next/link";
 import { signOut, useSession } from "next-auth/react";
 import { usePathname } from "next/navigation";
-import { useTheme } from "next-themes";
+import { useCustomTheme } from "./CustomThemeProvider";
 import { useEffect, useState } from "react";
 
 export default function Navbar() {
     const { data: session } = useSession();
     const pathname = usePathname();
-    const { theme, setTheme } = useTheme();
+    const { theme, setTheme } = useCustomTheme();
     const [mounted, setMounted] = useState(false);
 
     useEffect(() => setMounted(true), []);
@@ -44,7 +44,7 @@ export default function Navbar() {
                             <Link href="/timesheet/admin/invoices" className={`nav-link ${pathname === '/timesheet/admin/invoices' ? 'active' : ''}`}>Review Invoices</Link>
                         </>
                     )}
-                    {(roles.includes('lecturer') || session.user.role === 'lecturer') && (
+                    {(roles.includes('lecturer') || session.user.role === 'lecturer') && !roles.includes('incubator_staff') && (
                         <>
                             <Link href="/feedback/add" className={`nav-link ${pathname === '/feedback/add' ? 'active' : ''}`}>Add Feedback</Link>
                             <Link href="/timesheet" className={`nav-link ${pathname === '/timesheet' ? 'active' : ''}`}>Timesheet</Link>
@@ -147,10 +147,12 @@ export default function Navbar() {
                                     <span className="icon">📝</span>
                                     <span>Feedback</span>
                                 </Link>
-                                <Link href="/timesheet" className={`bottom-nav-item ${pathname === '/timesheet' ? 'active' : ''}`}>
-                                    <span className="icon">⏱️</span>
-                                    <span>Times</span>
-                                </Link>
+                                {!roles.includes('incubator_staff') && (
+                                    <Link href="/timesheet" className={`bottom-nav-item ${pathname === '/timesheet' ? 'active' : ''}`}>
+                                        <span className="icon">⏱️</span>
+                                        <span>Times</span>
+                                    </Link>
+                                )}
                             </>
                         )}
                     </>

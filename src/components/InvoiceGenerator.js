@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useSession } from "next-auth/react";
 import toast from "react-hot-toast";
 import { submitInvoice } from "@/app/actions/invoiceActions";
 
@@ -9,7 +10,7 @@ const MONTH_NAMES = [
     'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
-export default function InvoiceGenerator({ entries, lecturers, currentUserId, isAdmin: initialIsAdmin }) {
+export default function InvoiceGenerator({ entries, lecturers, invoices = [], currentUserId, isAdmin: initialIsAdmin }) {
     const { data: session } = useSession();
     const currentDate = new Date();
     const [selectedLecturer, setSelectedLecturer] = useState(initialIsAdmin ? '' : (currentUserId || ''));
@@ -31,10 +32,10 @@ export default function InvoiceGenerator({ entries, lecturers, currentUserId, is
     const userRoles = lecturerInfo?.roles || [lecturerInfo?.role] || [];
     const isLecturerRole = userRoles.includes('lecturer');
     const isStaffRole = userRoles.includes('incubator_staff');
-    const isAdminAccount = userRoles.some(r => ['admin', 'administrator'].includes(r));
+    const initialIsAdminAccount = userRoles.some(r => ['admin', 'administrator'].includes(r));
 
     // Pure staff mode = has staff role but NOT lecturer and NOT admin
-    const isPureStaffRole = isStaffRole && !isLecturerRole && !isAdminAccount;
+    const isPureStaffRole = isStaffRole && !isLecturerRole && !initialIsAdminAccount;
 
     const filteredEntries = useMemo(() => {
         return (entries || []).filter(e => {
@@ -60,13 +61,21 @@ export default function InvoiceGenerator({ entries, lecturers, currentUserId, is
 
     const monthName = MONTH_NAMES[Number(selectedMonth)] || '';
     const periodLabel = `${monthName} ${selectedYear}`;
-    const invoiceNo = `${String(selectedMonth).padStart(2, '0')}${selectedYear.slice(-2)}001`; // Automatic No
+    const invoiceNo = String(selectedMonth).padStart(2, '0');
 
     const availableYears = useMemo(() => {
         const years = [...new Set((entries || []).map(e => new Date(e.work_date).getFullYear()))].sort((a, b) => b - a);
         if (years.length === 0) years.push(currentDate.getFullYear());
         return years;
     }, [entries]);
+
+    const existingInvoice = useMemo(() => {
+        return invoices.find(inv =>
+            inv.month === monthName &&
+            inv.year === selectedYear &&
+            (initialIsAdmin ? inv.user_id === selectedLecturer : true)
+        );
+    }, [invoices, monthName, selectedYear, selectedLecturer, initialIsAdmin]);
 
     const handleSubmitInvoice = async () => {
         setSubmissionLoading(true);
@@ -132,7 +141,7 @@ export default function InvoiceGenerator({ entries, lecturers, currentUserId, is
 
             doc.setFont('helvetica', 'normal');
             doc.text(invoiceNo, 175, 58);
-            doc.text(new Date().toLocaleDateString(), 175, 72);
+            doc.text(`15/${String(selectedMonth).padStart(2, '0')}/${selectedYear}`, 175, 72);
 
             // 4. Client Info (Middle Left)
             doc.setFont('helvetica', 'bold');
@@ -184,11 +193,13 @@ export default function InvoiceGenerator({ entries, lecturers, currentUserId, is
                     lineColor: [200, 200, 200]
                 },
                 columnStyles: !isPureStaffRole ? {
-                    0: { cellWidth: 30 },
-                    2: { cellWidth: 40, halign: 'right' },
-                    3: { cellWidth: 40, halign: 'right' }
+                    0: { cellWidth: 25 },
+                    1: { cellWidth: 'auto' },
+                    2: { cellWidth: 35, halign: 'right' },
+                    3: { cellWidth: 35, halign: 'right' }
                 } : {
-                    1: { cellWidth: 50, halign: 'right' }
+                    0: { cellWidth: 'auto' },
+                    1: { cellWidth: 40, halign: 'right' }
                 }
             });
 
@@ -208,14 +219,16 @@ export default function InvoiceGenerator({ entries, lecturers, currentUserId, is
 
             // 8. Totals (Bottom Right)
             const rightColX = 140;
+            const valueX = 195;
             doc.text('Subtotal', rightColX, finalY);
-            doc.text('Tax', rightColX, finalY + 10);
+            doc.text(grossTotal.toLocaleString(), valueX, finalY, { align: 'right' });
+
+            doc.text('Deduction', rightColX, finalY + 10);
+            doc.text(`-${Number(deduction).toLocaleString()}`, valueX, finalY + 10, { align: 'right' });
+
             doc.setFont('helvetica', 'bold');
             doc.text('GROSS TOTAL', rightColX, finalY + 25);
-
-            // Total Value Box
-            doc.rect(165, finalY + 15, 30, 15);
-            doc.text(finalTotal.toLocaleString(), 180, finalY + 25, { align: 'center' });
+            doc.text(finalTotal.toLocaleString(), valueX, finalY + 25, { align: 'right' });
 
             if (deduction > 0) {
                 doc.setFontSize(8);
@@ -226,7 +239,15 @@ export default function InvoiceGenerator({ entries, lecturers, currentUserId, is
             // 9. Signature
             doc.setTextColor(0, 0, 0);
             doc.setFontSize(10);
-            doc.text('Signature', 20, finalY + 65);
+            doc.text('Signature', 20, finalY + 45);
+
+            if (lecturerInfo?.e_signature) {
+                try {
+                    doc.addImage(lecturerInfo.e_signature, 'PNG', 20, finalY + 50, 40, 15);
+                } catch (e) {
+                    console.error("Signature Render Error:", e);
+                }
+            }
 
             doc.save(`Invoice_${lecturerInfo?.name?.[0] || 'staff'}_${monthName}_${selectedYear}.pdf`);
             toast.success('📄 PDF downloaded!');
@@ -237,8 +258,8 @@ export default function InvoiceGenerator({ entries, lecturers, currentUserId, is
     }
 
     async function exportWord() {
-        if (!selectedLecturer || filteredEntries.length === 0) {
-            toast.error("Select a lecturer with approved entries first");
+        if (!selectedLecturer || (!isPureStaffRole && filteredEntries.length === 0)) {
+            toast.error(isPureStaffRole ? "Select a staff member first" : "Select a lecturer with approved entries first");
             return;
         }
         try {
@@ -252,7 +273,7 @@ export default function InvoiceGenerator({ entries, lecturers, currentUserId, is
                 right: { style: BorderStyle.SINGLE, size: 1 },
             };
 
-            const tableRows = [
+            const tableRows = !isPureStaffRole ? [
                 new TableRow({
                     tableHeader: true,
                     children: ['#', 'Date', 'In Time', 'Out Time', 'Hours'].map(h =>
@@ -296,6 +317,29 @@ export default function InvoiceGenerator({ entries, lecturers, currentUserId, is
                         }),
                     ],
                 }),
+            ] : [
+                new TableRow({
+                    tableHeader: true,
+                    children: ['Description', 'Total - LKR'].map(h =>
+                        new TableCell({
+                            children: [new Paragraph({ children: [new TextRun({ text: h, bold: true, size: 20, color: 'FFFFFF' })], alignment: h === 'Description' ? AlignmentType.LEFT : AlignmentType.RIGHT })],
+                            shading: { fill: '6366F1' },
+                            borders: headerBorder,
+                        })
+                    ),
+                }),
+                new TableRow({
+                    children: [
+                        new TableCell({
+                            children: [new Paragraph({ children: [new TextRun({ text: `Professional service fees for the month of ${monthName} ${selectedYear}`, size: 18 })] })],
+                            borders: headerBorder,
+                        }),
+                        new TableCell({
+                            children: [new Paragraph({ children: [new TextRun({ text: grossTotal.toLocaleString(), bold: true, size: 18 })], alignment: AlignmentType.RIGHT })],
+                            borders: headerBorder,
+                        }),
+                    ],
+                })
             ];
 
             const doc = new Document({
@@ -342,7 +386,7 @@ export default function InvoiceGenerator({ entries, lecturers, currentUserId, is
                             value={selectedLecturer}
                             onChange={e => setSelectedLecturer(e.target.value)}
                             style={{ width: '100%' }}
-                            disabled={!isAdmin}
+                            disabled={!initialIsAdmin}
                         >
                             <option value="">— Select Member —</option>
                             {(lecturers || []).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
@@ -360,17 +404,7 @@ export default function InvoiceGenerator({ entries, lecturers, currentUserId, is
                             {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
                         </select>
                     </div>
-                    {isStaffRole && (
-                        <div>
-                            <label>Deductions (LKR)</label>
-                            <input
-                                type="number"
-                                value={deduction}
-                                onChange={e => setDeduction(e.target.value)}
-                                placeholder="0.00"
-                            />
-                        </div>
-                    )}
+                    {/* Deductions and Salary hidden as per user request (Admin handles this during review) */}
                 </div>
             </div>
 
@@ -380,13 +414,45 @@ export default function InvoiceGenerator({ entries, lecturers, currentUserId, is
                     <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>📋</div>
                     <p>Select a member to preview their invoice</p>
                 </div>
-            ) : filteredEntries.length === 0 ? (
+            ) : (!isPureStaffRole && filteredEntries.length === 0) ? (
                 <div className="glass-card text-center" style={{ padding: '3rem', color: 'var(--text-secondary)' }}>
                     <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>📭</div>
                     <p>No approved entries for {lecturerInfo?.name} in {periodLabel}</p>
                 </div>
             ) : (
                 <div className="glass-card animate-fade-in-scale" style={{ padding: '2.5rem', maxWidth: '800px', margin: '0 auto', background: 'white', color: 'black' }}>
+                    {/* Status Bar (Only if submitted) */}
+                    {existingInvoice && (
+                        <div className={`mb-10 p-5 rounded-2xl flex items-center justify-between border-2 animate-fade-in ${existingInvoice.status === 'approved'
+                            ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                            : 'bg-amber-50 border-amber-200 text-amber-800'
+                            }`} style={{
+                                backgroundColor: existingInvoice.status === 'approved' ? '#ecfdf5' : '#fffbeb',
+                                borderColor: existingInvoice.status === 'approved' ? '#a7f3d0' : '#fde68a'
+                            }}>
+                            <div className="flex items-center gap-4">
+                                <span style={{ fontSize: '1.5rem' }}>{existingInvoice.status === 'approved' ? '✅' : '⏳'}</span>
+                                <div>
+                                    <p className="font-bold uppercase tracking-widest text-[10px]">
+                                        Status: {existingInvoice.status}
+                                    </p>
+                                    <p className="text-sm font-medium opacity-90">
+                                        {existingInvoice.status === 'approved'
+                                            ? "Administrator has authorized this invoice."
+                                            : "This invoice is currently pending review."
+                                        }
+                                    </p>
+                                </div>
+                            </div>
+                            {existingInvoice.status === 'approved' && (
+                                <div className="text-right border-l border-emerald-200 pl-6">
+                                    <p className="text-[10px] uppercase font-bold opacity-60 tracking-wider">Authorized Final Total</p>
+                                    <p className="text-2xl font-black tracking-tight">LKR {existingInvoice.amount?.toLocaleString()}</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                     {/* Invoice Header */}
                     <div className="text-center mb-8">
                         <h2 className="text-4xl font-extrabold tracking-tight" style={{ color: '#334155' }}>INVOICE</h2>
@@ -394,19 +460,6 @@ export default function InvoiceGenerator({ entries, lecturers, currentUserId, is
 
                     {/* Details Row */}
                     <div className="flex justify-between mb-12">
-                        {isPureStaffRole && (
-                            <div>
-                                <label className="block text-xs font-bold mb-1 opacity-70">Monthly Salary (LKR)</label>
-                                <input
-                                    type="number"
-                                    value={manualAmount}
-                                    onChange={(e) => setManualAmount(e.target.value)}
-                                    className="btn btn-secondary w-full text-left"
-                                    placeholder="Enter Amount"
-                                    style={{ background: 'white', color: 'black', border: '1px solid #ddd' }}
-                                />
-                            </div>
-                        )}
                         <div>
                             <h3 className="font-bold text-lg">{lecturerInfo?.name}</h3>
                             <p className="text-sm opacity-70">{lecturerInfo?.address || 'Address not set'}</p>
@@ -415,7 +468,7 @@ export default function InvoiceGenerator({ entries, lecturers, currentUserId, is
                         </div>
                         <div className="text-right">
                             <p className="text-sm"><strong>Invoice No :</strong> {invoiceNo}</p>
-                            <p className="text-sm"><strong>Date :</strong> {new Date().toLocaleDateString()}</p>
+                            <p className="text-sm"><strong>Date :</strong> 15/${String(selectedMonth).padStart(2, '0')}/${selectedYear}</p>
                         </div>
                     </div>
 
@@ -442,7 +495,7 @@ export default function InvoiceGenerator({ entries, lecturers, currentUserId, is
                                 <tr>
                                     {!isPureStaffRole && <td style={{ padding: '8px' }}>{totalHours.toFixed(2)} Hrs</td>}
                                     <td style={{ padding: '8px' }}>
-                                        Consultation and development services for the month of {monthName} {selectedYear}
+                                        {isPureStaffRole ? `Professional service fees for the month of ${monthName} ${selectedYear}` : `Consultation and development services for the month of ${monthName} ${selectedYear}`}
                                     </td>
                                     {!isPureStaffRole && <td style={{ textAlign: 'right', padding: '8px' }}>{houlyRate.toLocaleString()}</td>}
                                     <td style={{ textAlign: 'right', padding: '8px' }}>{grossTotal.toLocaleString()}</td>
@@ -460,32 +513,32 @@ export default function InvoiceGenerator({ entries, lecturers, currentUserId, is
                             <p className="text-xs">Account No: {lecturerInfo?.account_no || '-'}</p>
                             <p className="text-xs">Branch: {lecturerInfo?.branch || '-'}</p>
                         </div>
-                        <div style={{ minWidth: '200px' }}>
-                            <div className="flex justify-between py-1 text-sm border-b">
-                                <span>Subtotal</span>
+                        <div style={{ minWidth: '220px' }}>
+                            <div className="flex justify-between py-1 text-sm border-b border-black/10">
+                                <span className="font-medium">Subtotal</span>
                                 <span>{grossTotal.toLocaleString()}</span>
                             </div>
-                            <div className="flex justify-between py-1 text-sm border-b">
-                                <span>Tax</span>
-                                <span>0.00</span>
+                            <div className="flex justify-between py-1 text-sm border-b border-black/10">
+                                <span className="font-medium">Deduction</span>
+                                <span>-{Number(deduction).toLocaleString()}</span>
                             </div>
-                            <div className="flex justify-between py-2 font-bold text-lg">
+                            <div className="flex justify-between py-4 font-bold text-lg mt-2">
                                 <span>GROSS TOTAL</span>
-                                <span style={{ padding: '0.5rem', border: '1px solid black', minWidth: '100px', textAlign: 'right' }}>
-                                    {finalTotal.toLocaleString()}
-                                </span>
+                                <span>{finalTotal.toLocaleString()}</span>
                             </div>
-                            {deduction > 0 && (
-                                <p className="text-xs text-right text-red-500 italic mt-1">
-                                    Includes deduction: -{Number(deduction).toLocaleString()}
-                                </p>
-                            )}
                         </div>
                     </div>
 
                     {/* Signature */}
-                    <div className="mt-16 pt-8 border-t border-transparent">
-                        <p className="font-bold">Signature</p>
+                    <div className="mt-8 pt-8 border-t border-transparent">
+                        <p className="font-bold mb-2">Signature</p>
+                        {lecturerInfo?.e_signature && (
+                            <img
+                                src={lecturerInfo.e_signature}
+                                alt="Staff Signature"
+                                style={{ maxHeight: '60px', display: 'block' }}
+                            />
+                        )}
                     </div>
 
                     {/* Real Export Buttons */}
