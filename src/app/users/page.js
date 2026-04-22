@@ -18,7 +18,8 @@ export default function UsersPage() {
 
     useEffect(() => {
         if (status === "loading") return;
-        const isAdmin = session?.user?.roles?.includes('admin') || session?.user?.role === 'admin';
+        const isAdmin = session?.user?.roles?.some(r => ['admin', 'administrator'].includes(r)) ||
+            ['admin', 'administrator'].includes(session?.user?.role);
         if (!session || !isAdmin) {
             router.push("/dashboard");
             return;
@@ -82,8 +83,8 @@ export default function UsersPage() {
                                     <td className="flex gap-1 flex-wrap">
                                         {(u.roles || [u.role]).map((r, i) => (
                                             <span key={i} className="badge" style={{
-                                                background: r === 'admin' ? 'rgba(239, 68, 68, 0.1)' : r === 'incubator_staff' ? 'rgba(99, 102, 241, 0.1)' : 'rgba(34, 197, 94, 0.1)',
-                                                color: r === 'admin' ? 'var(--danger)' : r === 'incubator_staff' ? 'var(--accent-color)' : 'var(--success)',
+                                                background: ['admin', 'administrator'].includes(r) ? 'rgba(239, 68, 68, 0.1)' : r === 'incubator_staff' ? 'rgba(99, 102, 241, 0.1)' : 'rgba(34, 197, 94, 0.1)',
+                                                color: ['admin', 'administrator'].includes(r) ? 'var(--danger)' : r === 'incubator_staff' ? 'var(--accent-color)' : 'var(--success)',
                                                 fontSize: '0.65rem',
                                                 padding: '0.2rem 0.5rem'
                                             }}>

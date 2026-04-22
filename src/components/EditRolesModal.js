@@ -5,7 +5,7 @@ import { updateUserRoles } from "@/app/actions/usersActions";
 import toast from "react-hot-toast";
 
 export default function EditRolesModal({ user, onClose }) {
-    const initialRoles = user.roles || [user.role];
+    const initialRoles = (user.roles || [user.role]).map(r => r === 'administrator' ? 'admin' : r);
     const [selectedRoles, setSelectedRoles] = useState(initialRoles);
     const [loading, setLoading] = useState(false);
 

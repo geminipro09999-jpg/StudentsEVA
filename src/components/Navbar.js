@@ -76,8 +76,8 @@ export default function Navbar() {
                         )}
                         <div className="flex gap-1">
                             {roles.map((r, i) => (
-                                <span key={i} className={`badge ${r === 'admin' ? 'badge-admin' : 'badge-lecturer'}`} style={{ fontSize: '0.6rem' }}>
-                                    {r}
+                                <span key={i} className={`badge ${['admin', 'administrator'].includes(r) ? 'badge-admin' : 'badge-lecturer'}`} style={{ fontSize: '0.6rem' }}>
+                                    {r.toUpperCase().replace('_', ' ')}
                                 </span>
                             ))}
                         </div>
