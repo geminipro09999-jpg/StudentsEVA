@@ -179,7 +179,7 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
                 startY: 125,
                 head: head,
                 body: body,
-                theme: 'plain',
+                theme: 'grid',
                 headStyles: {
                     fillColor: [255, 255, 255],
                     textColor: [0, 0, 0],
@@ -208,7 +208,7 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
             // 7. Bank Account Details (Bottom Left)
             doc.setFontSize(10);
             doc.setFont('helvetica', 'bold');
-            doc.text('Bank Account Details', 20, finalY);
+            doc.text('Bank Details', 20, finalY);
             doc.setFont('helvetica', 'normal');
             doc.text([
                 `Account Name: ${lecturerInfo?.account_name || '-'}`,
@@ -236,10 +236,10 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
                 doc.text(`(Includes deduction: -${deduction.toLocaleString()})`, 180, finalY + 34, { align: 'center' });
             }
 
-            // 9. Signature
+            // 9. Signatures
             doc.setTextColor(0, 0, 0);
             doc.setFontSize(10);
-            doc.text('Signature', 20, finalY + 45);
+            doc.text('Lecturer Signature', 20, finalY + 45);
 
             if (lecturerInfo?.e_signature) {
                 try {
@@ -507,7 +507,7 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
                     {/* Lower Section */}
                     <div className="flex justify-between gap-8">
                         <div>
-                            <h4 className="font-bold text-sm mb-2">Bank Account Details</h4>
+                            <h4 className="font-bold text-sm mb-2">Bank Details</h4>
                             <p className="text-xs">Account Name: {lecturerInfo?.account_name || '-'}</p>
                             <p className="text-xs">Bank Name: {lecturerInfo?.bank_name || '-'}</p>
                             <p className="text-xs">Account No: {lecturerInfo?.account_no || '-'}</p>
@@ -529,15 +529,17 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
                         </div>
                     </div>
 
-                    {/* Signature */}
+                    {/* Signatures */}
                     <div className="mt-8 pt-8 border-t border-transparent">
-                        <p className="font-bold mb-2">Signature</p>
-                        {lecturerInfo?.e_signature && (
+                        <p className="font-bold mb-2">Lecturer Signature</p>
+                        {lecturerInfo?.e_signature ? (
                             <img
                                 src={lecturerInfo.e_signature}
                                 alt="Staff Signature"
                                 style={{ maxHeight: '60px', display: 'block' }}
                             />
+                        ) : (
+                            <div style={{ height: '60px' }}></div>
                         )}
                     </div>
 

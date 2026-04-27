@@ -138,7 +138,19 @@ export default function AdminInvoicesPage() {
                     `Professional service fees for the month of ${inv.month} ${inv.year}`,
                     currentBase.toLocaleString()
                 ]],
-                theme: 'striped'
+                theme: 'grid',
+                headStyles: {
+                    fillColor: [255, 255, 255],
+                    textColor: [0, 0, 0],
+                    fontStyle: 'bold',
+                    lineWidth: 0.5,
+                    lineColor: [0, 0, 0]
+                },
+                bodyStyles: {
+                    textColor: [0, 0, 0],
+                    lineWidth: 0.1,
+                    lineColor: [200, 200, 200]
+                }
             });
 
             const finalY = doc.lastAutoTable.finalY + 15;
@@ -169,10 +181,10 @@ export default function AdminInvoicesPage() {
             // Total Value
             doc.text(finalTotal.toLocaleString(), 195, finalY + 25, { align: 'right' });
 
-            // Signature
+            // Signatures
             doc.setTextColor(0, 0, 0);
             doc.setFontSize(10);
-            doc.text('Authorized Signature', 20, finalY + 45);
+            doc.text('Lecturer Signature', 20, finalY + 45);
 
             if (staff.e_signature) {
                 try {
