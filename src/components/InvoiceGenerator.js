@@ -17,10 +17,10 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
     const [selectedMonth, setSelectedMonth] = useState(String(currentDate.getMonth() + 1));
     const [selectedYear, setSelectedYear] = useState(String(currentDate.getFullYear()));
     const [deduction, setDeduction] = useState(0);
-    const [manualAmount, setManualAmount] = useState(0);
-    const [submissionStatus, setSubmissionStatus] = useState(null);
+    const [manualRate, setManualRate] = useState('');
     const [submissionLoading, setSubmissionLoading] = useState(false);
     const [isSubmitted, setIsSubmitted] = useState(false);
+    const [invoiceType, setInvoiceType] = useState('timesheet');
 
     const lecturerMap = useMemo(() => {
         const m = {};
@@ -34,8 +34,12 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
     const isStaffRole = userRoles.includes('incubator_staff');
     const initialIsAdminAccount = userRoles.some(r => ['admin', 'administrator'].includes(r));
 
-    // Pure staff mode = has staff role but NOT lecturer and NOT admin
-    const isPureStaffRole = isStaffRole && !isLecturerRole && !initialIsAdminAccount;
+    // Support dynamic hourly rate from user profile, admin can override
+    const currentRate = Number(manualRate) || lecturerInfo?.hourly_rate || 3000;
+    const currentUnit = lecturerInfo?.payment_unit || 'hour';
+
+    const activeInvoiceType = (!isLecturerRole && isStaffRole) ? 'fixed' : ((!isStaffRole && isLecturerRole) ? 'timesheet' : invoiceType);
+    const isFixedInvoice = activeInvoiceType === 'fixed';
 
     const filteredEntries = useMemo(() => {
         return (entries || []).filter(e => {
@@ -51,13 +55,8 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
 
     const totalHours = filteredEntries.reduce((s, e) => s + Number(e.hours), 0);
 
-    // Salary calculation
-    const houlyRate = 3000;
-    const calculatedGross = totalHours * houlyRate;
-
-    // Use manual salary for pure staff, otherwise use calculated total
-    const grossTotal = isPureStaffRole ? Number(manualAmount) : calculatedGross;
-    const finalTotal = grossTotal - Number(deduction);
+    // Salary calculation using dynamic rate
+    const calculatedGross = totalHours * currentRate;
 
     const monthName = MONTH_NAMES[Number(selectedMonth)] || '';
     const periodLabel = `${monthName} ${selectedYear}`;
@@ -77,6 +76,19 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
         );
     }, [invoices, monthName, selectedYear, selectedLecturer, initialIsAdmin]);
 
+    // Use existing approved amount for fixed invoices, otherwise use calculated total
+    const grossTotal = isFixedInvoice ? Number(existingInvoice?.amount || 0) : calculatedGross;
+    const finalTotal = grossTotal - Number(deduction);
+
+    const handleLoadInvoice = (inv) => {
+        const monthIndex = MONTH_NAMES.indexOf(inv.month);
+        if (monthIndex > 0) setSelectedMonth(String(monthIndex));
+        setSelectedYear(String(inv.year));
+        if (initialIsAdmin && inv.user_id) setSelectedLecturer(inv.user_id);
+
+        toast.success(`Loaded data for ${inv.month} ${inv.year}. Scroll down to preview/download.`);
+    };
+
     const handleSubmitInvoice = async () => {
         setSubmissionLoading(true);
         const res = await submitInvoice({
@@ -85,7 +97,8 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
             year: selectedYear,
             amount: finalTotal,
             deductions: deduction,
-            houlyRate,
+            hourlyRate: currentRate,
+            paymentUnit: currentUnit,
             totalHours,
             items: filteredEntries,
             lecturerName: lecturerInfo?.name,
@@ -102,8 +115,12 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
     };
 
     async function exportPDF() {
-        if (!selectedLecturer || (!isPureStaffRole && filteredEntries.length === 0)) {
-            toast.error(isPureStaffRole ? "Select a staff member first" : "No approved records found for this period");
+        if (!selectedLecturer) {
+            toast.error("Select a staff member first");
+            return;
+        }
+        if (!isFixedInvoice && filteredEntries.length === 0) {
+            toast.error("No approved records found for this period");
             return;
         }
         try {
@@ -154,56 +171,36 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
                 'unicomtic@gmail.com'
             ], 20, 102);
 
-            // 5. Table Data (MATCH ROLE)
-            let head = [];
-            let body = [];
+            let headSummary = [];
+            let bodySummary = [];
 
-            if (!isPureStaffRole) {
-                head = [['Quantity', 'Description', 'Unit Price', 'Total - LKR']];
-                body = [[
-                    `${totalHours.toFixed(2)} Hrs`,
+            if (!isFixedInvoice) {
+                headSummary = [['Quantity', 'Description', 'Unit Price', 'Total - LKR']];
+                bodySummary = [[
+                    `${totalHours.toFixed(2)} ${currentUnit === 'hour' ? 'Hrs' : 'Units'}`,
                     `Consultation and development services for the month of ${monthName} ${selectedYear}`,
-                    houlyRate.toLocaleString(),
+                    currentRate.toLocaleString(),
                     grossTotal.toLocaleString()
                 ]];
             } else {
-                head = [['Description', 'Total - LKR']];
-                body = [[
+                headSummary = [['Description', 'Total - LKR']];
+                bodySummary = [[
                     `Professional service fees for the month of ${monthName} ${selectedYear}`,
                     grossTotal.toLocaleString()
                 ]];
             }
 
-            // 6. Draw Table
             autoTable(doc, {
                 startY: 125,
-                head: head,
-                body: body,
+                head: headSummary,
+                body: bodySummary,
                 theme: 'grid',
-                headStyles: {
-                    fillColor: [255, 255, 255],
-                    textColor: [0, 0, 0],
-                    fontStyle: 'bold',
-                    lineWidth: 0.5,
-                    lineColor: [0, 0, 0]
-                },
-                bodyStyles: {
-                    textColor: [0, 0, 0],
-                    lineWidth: 0.1,
-                    lineColor: [200, 200, 200]
-                },
-                columnStyles: !isPureStaffRole ? {
-                    0: { cellWidth: 25 },
-                    1: { cellWidth: 'auto' },
-                    2: { cellWidth: 35, halign: 'right' },
-                    3: { cellWidth: 35, halign: 'right' }
-                } : {
-                    0: { cellWidth: 'auto' },
-                    1: { cellWidth: 40, halign: 'right' }
-                }
+                headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: 'bold', lineWidth: 0.5, lineColor: [0, 0, 0] },
+                bodyStyles: { textColor: [0, 0, 0], lineWidth: 0.1, lineColor: [200, 200, 200] },
+                columnStyles: !isFixedInvoice ? { 0: { cellWidth: 25 }, 1: { cellWidth: 'auto' }, 2: { cellWidth: 35, halign: 'right' }, 3: { cellWidth: 35, halign: 'right' } } : { 0: { cellWidth: 'auto' }, 1: { cellWidth: 40, halign: 'right' } }
             });
 
-            const finalY = doc.lastAutoTable.finalY + 10;
+            const finalY = doc.lastAutoTable.finalY + 15;
 
             // 7. Bank Account Details (Bottom Left)
             doc.setFontSize(10);
@@ -249,7 +246,8 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
                 }
             }
 
-            doc.save(`Invoice_${lecturerInfo?.name?.[0] || 'staff'}_${monthName}_${selectedYear}.pdf`);
+            const fileName = `${lecturerInfo?.name || 'Invoice'} ${monthName} ${String(selectedMonth).padStart(2, '0')}.pdf`;
+            doc.save(fileName);
             toast.success('📄 PDF downloaded!');
         } catch (err) {
             console.error("PDF Gen Error:", err);
@@ -258,8 +256,12 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
     }
 
     async function exportWord() {
-        if (!selectedLecturer || (!isPureStaffRole && filteredEntries.length === 0)) {
-            toast.error(isPureStaffRole ? "Select a staff member first" : "Select a lecturer with approved entries first");
+        if (!selectedLecturer) {
+            toast.error("Select a member first");
+            return;
+        }
+        if (!isFixedInvoice && filteredEntries.length === 0) {
+            toast.error("No approved records found for this period");
             return;
         }
         try {
@@ -273,7 +275,7 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
                 right: { style: BorderStyle.SINGLE, size: 1 },
             };
 
-            const tableRows = !isPureStaffRole ? [
+            const tableRows = !isFixedInvoice ? [
                 new TableRow({
                     tableHeader: true,
                     children: ['#', 'Date', 'In Time', 'Out Time', 'Hours'].map(h =>
@@ -352,7 +354,9 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
                         new Paragraph({ children: [new TextRun({ text: 'Period: ', bold: true, size: 22 }), new TextRun({ text: periodLabel, size: 22 })], spacing: { after: 80 } }),
                         new Paragraph({ children: [new TextRun({ text: `Generated: ${new Date().toLocaleDateString()}`, size: 18, color: '999999' })], spacing: { after: 300 } }),
                         new Table({ rows: tableRows, width: { size: 100, type: WidthType.PERCENTAGE } }),
-                        new Paragraph({ text: '', spacing: { before: 600 } }),
+                        new Paragraph({ text: '', spacing: { before: 200 } }),
+                        new Paragraph({ children: [new TextRun({ text: `Payment Rate: ${currentRate.toLocaleString()} LKR per ${currentUnit}`, bold: true, size: 18 })] }),
+                        new Paragraph({ text: '', spacing: { before: 400 } }),
                         new Paragraph({ children: [new TextRun({ text: '____________________________                                              ____________________________', size: 20 })], spacing: { before: 400 } }),
                         new Paragraph({ children: [new TextRun({ text: '      Lecturer Signature                                                                   Admin Signature', size: 18, color: '666666' })] }),
                         new Paragraph({ text: '', spacing: { before: 300 } }),
@@ -365,7 +369,7 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `Invoice_${lecturerInfo?.name?.replace(/\s+/g, '_') || 'lecturer'}_${periodLabel.replace(/\s+/g, '_')}.docx`;
+            a.download = `${lecturerInfo?.name || 'Invoice'} ${monthName} ${String(selectedMonth).padStart(2, '0')}.docx`;
             a.click();
             URL.revokeObjectURL(url);
             toast.success('📝 Word document downloaded!');
@@ -377,6 +381,57 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
 
     return (
         <div>
+            {/* Payment History Table */}
+            <div className="mt-4 mb-12">
+                <div className="page-hero" style={{ marginBottom: '1.5rem', paddingBottom: '0.5rem', borderBottom: 'none' }}>
+                    <h3 className="text-xl font-bold">📂 Payment History</h3>
+                    <p>Select a past approved invoice to download its official document</p>
+                </div>
+                <div className="glass-card animate-fade-in">
+                    <div style={{ overflowX: 'auto' }}>
+                        <table className="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Period</th>
+                                    <th>Inv No</th>
+                                    <th>Amount (LKR)</th>
+                                    <th>Status</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {!invoices || invoices.length === 0 ? (
+                                    <tr>
+                                        <td colSpan="5" className="text-center py-6 text-secondary">No payment history found.</td>
+                                    </tr>
+                                ) : (
+                                    invoices.map(inv => (
+                                        <tr key={inv.id}>
+                                            <td className="font-semibold">{inv.month} {inv.year}</td>
+                                            <td className="text-xs font-mono">{String(inv.month_no || 0).padStart(2, '0')}</td>
+                                            <td className="font-bold">{(inv.amount || 0).toLocaleString()}</td>
+                                            <td>
+                                                <span className={`badge ${inv.status === 'approved' ? 'badge-success' : 'badge-warning'}`}>
+                                                    {inv.status?.toUpperCase()}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <button
+                                                    onClick={() => handleLoadInvoice(inv)}
+                                                    className="btn btn-secondary px-3 py-1 text-xs"
+                                                >
+                                                    {inv.status === 'approved' ? '📄 View / Download' : '🔍 View Draft'}
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
             {/* Filters */}
             <div className="glass-card mb-4" style={{ padding: '1.25rem' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', alignItems: 'end' }}>
@@ -404,7 +459,32 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
                             {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
                         </select>
                     </div>
-                    {/* Deductions and Salary hidden as per user request (Admin handles this during review) */}
+                    {initialIsAdmin ? (
+                        <div>
+                            <label>Rate per Hour (LKR) *</label>
+                            <input
+                                type="number"
+                                value={manualRate}
+                                onChange={e => setManualRate(e.target.value)}
+                                placeholder={`Default: ${lecturerInfo?.hourly_rate || 3000}`}
+                                style={{ width: '100%' }}
+                                className="bg-transparent border border-card-border rounded px-2 py-1 focus:border-primary transition-colors"
+                            />
+                        </div>
+                    ) : (
+                        <div>
+                            <p className="text-xs text-secondary font-semibold">Rate: {currentRate.toLocaleString()} / {currentUnit}</p>
+                        </div>
+                    )}
+                    {isLecturerRole && isStaffRole && (
+                        <div>
+                            <label>Invoice Type</label>
+                            <select value={invoiceType} onChange={e => setInvoiceType(e.target.value)} style={{ width: '100%' }}>
+                                <option value="timesheet">Timesheet (Hourly/Unit)</option>
+                                <option value="fixed">Fixed Monthly Salary</option>
+                            </select>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -414,13 +494,13 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
                     <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>📋</div>
                     <p>Select a member to preview their invoice</p>
                 </div>
-            ) : (!isPureStaffRole && filteredEntries.length === 0) ? (
+            ) : (!isFixedInvoice && filteredEntries.length === 0) ? (
                 <div className="glass-card text-center" style={{ padding: '3rem', color: 'var(--text-secondary)' }}>
                     <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>📭</div>
                     <p>No approved entries for {lecturerInfo?.name} in {periodLabel}</p>
                 </div>
             ) : (
-                <div className="glass-card animate-fade-in-scale" style={{ padding: '2.5rem', maxWidth: '800px', margin: '0 auto', background: 'white', color: 'black' }}>
+                <div className="glass-card animate-fade-in-scale" style={{ padding: '2.5rem', maxWidth: '800px', margin: '0 auto', background: 'white', color: 'black', boxShadow: '0 20px 50px rgba(0,0,0,0.1)' }}>
                     {/* Status Bar (Only if submitted) */}
                     {existingInvoice && (
                         <div className={`mb-10 p-5 rounded-2xl flex items-center justify-between border-2 animate-fade-in ${existingInvoice.status === 'approved'
@@ -480,24 +560,24 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
                         <p className="text-sm opacity-70">unicomtic@gmail.com</p>
                     </div>
 
-                    {/* Table */}
-                    <div className="border-t border-b border-black py-4 mb-4">
+                    {/* Summary Table */}
+                    <div className="border-t border-b border-black py-4 mb-8">
                         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                             <thead>
                                 <tr style={{ borderBottom: '1px solid black' }}>
-                                    {!isPureStaffRole && <th style={{ textAlign: 'left', padding: '8px' }}>Quantity</th>}
+                                    {!isFixedInvoice && <th style={{ textAlign: 'left', padding: '8px' }}>Quantity</th>}
                                     <th style={{ textAlign: 'left', padding: '8px' }}>Description</th>
-                                    {!isPureStaffRole && <th style={{ textAlign: 'right', padding: '8px' }}>Unit Price</th>}
+                                    {!isFixedInvoice && <th style={{ textAlign: 'right', padding: '8px' }}>Unit Price</th>}
                                     <th style={{ textAlign: 'right', padding: '8px' }}>Total - LKR</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <tr>
-                                    {!isPureStaffRole && <td style={{ padding: '8px' }}>{totalHours.toFixed(2)} Hrs</td>}
+                                    {!isFixedInvoice && <td style={{ padding: '8px' }}>{totalHours.toFixed(2)} {currentUnit === 'hour' ? 'Hrs' : 'Units'}</td>}
                                     <td style={{ padding: '8px' }}>
-                                        {isPureStaffRole ? `Professional service fees for the month of ${monthName} ${selectedYear}` : `Consultation and development services for the month of ${monthName} ${selectedYear}`}
+                                        {isFixedInvoice ? `Professional service fees for the month of ${monthName} ${selectedYear}` : `Consultation and development services for the month of ${monthName} ${selectedYear}`}
                                     </td>
-                                    {!isPureStaffRole && <td style={{ textAlign: 'right', padding: '8px' }}>{houlyRate.toLocaleString()}</td>}
+                                    {!isFixedInvoice && <td style={{ textAlign: 'right', padding: '8px' }}>{currentRate.toLocaleString()}</td>}
                                     <td style={{ textAlign: 'right', padding: '8px' }}>{grossTotal.toLocaleString()}</td>
                                 </tr>
                             </tbody>
@@ -544,30 +624,38 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
                     </div>
 
                     {/* Real Export Buttons */}
-                    <div className="mt-8 pt-4 border-t border-gray-200 flex flex-col items-center gap-4" style={{ background: 'var(--bg-primary)', padding: '1.5rem', borderRadius: '1rem' }}>
-                        <div className="flex gap-4 justify-center">
-                            <button onClick={exportPDF} className="btn btn-secondary">
-                                📄 Download Draft PDF
-                            </button>
-                            {!isSubmitted ? (
-                                <button
-                                    onClick={handleSubmitInvoice}
-                                    disabled={submissionLoading}
-                                    className="btn btn-primary"
-                                    style={{ background: 'var(--accent-color)' }}
-                                >
-                                    {submissionLoading ? "Submitting..." : "📤 Submit for Approval"}
+                    <div className="mt-8 pt-4 border-t border-gray-200 flex flex-col items-center gap-4 no-print" style={{ background: '#f8fafc', padding: '1.5rem', borderRadius: '1rem' }}>
+                        {existingInvoice?.status === 'approved' ? (
+                            <div className="flex gap-4 justify-center w-full">
+                                <button onClick={exportPDF} className="btn btn-primary" style={{ background: '#10b981', color: 'white', borderColor: '#059669' }}>
+                                    📄 Download Official PDF
                                 </button>
-                            ) : (
-                                <div className="flex items-center gap-2 text-success font-bold px-6 py-2 rounded-full border-2 border-success bg-success/5 animate-fade-in">
-                                    <span>✅ Submitted</span>
-                                </div>
-                            )}
-                        </div>
-                        {isSubmitted && (
-                            <p className="text-xs text-secondary italic">
-                                Your invoice is now pending review by the Administrator. You can still download the draft.
-                            </p>
+                                <button onClick={exportWord} className="btn btn-secondary bg-blue-50 text-blue-700 border-blue-200">
+                                    📝 Download Word Document
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="flex flex-col items-center gap-4 justify-center w-full">
+                                {(!isSubmitted && !existingInvoice) ? (
+                                    <button
+                                        onClick={handleSubmitInvoice}
+                                        disabled={submissionLoading}
+                                        className="btn btn-primary w-full max-w-xs"
+                                        style={{ background: 'var(--accent-color)' }}
+                                    >
+                                        {submissionLoading ? "Submitting..." : "📤 Submit for Approval"}
+                                    </button>
+                                ) : (
+                                    <div className="flex items-center gap-2 text-amber-600 font-bold px-6 py-2 rounded-full border-2 border-amber-400 bg-amber-50 animate-fade-in">
+                                        <span>⏳ Pending Admin Approval</span>
+                                    </div>
+                                )}
+                                <p className="text-xs text-secondary italic text-center mt-2">
+                                    {(!isSubmitted && !existingInvoice) ?
+                                        "You must submit this invoice to the Administrator for approval before generation." :
+                                        "The official invoice will be available to download once the Administrator approves it."}
+                                </p>
+                            </div>
                         )}
                     </div>
                 </div>

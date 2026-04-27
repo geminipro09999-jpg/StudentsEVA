@@ -10,6 +10,18 @@ export default function AddUserPage() {
     const { data: session } = useSession();
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
+    const [selectedRoles, setSelectedRoles] = useState(['lecturer']);
+
+    const handleRoleChange = (e) => {
+        const { value, checked } = e.target;
+        if (checked) {
+            setSelectedRoles(prev => [...prev, value]);
+        } else {
+            setSelectedRoles(prev => prev.filter(r => r !== value));
+        }
+    };
+
+    const isTimesheetUser = selectedRoles.includes('lecturer');
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -67,19 +79,35 @@ export default function AddUserPage() {
                         <label>Roles</label>
                         <div className="flex flex-wrap gap-4 p-3 rounded" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--card-border)' }}>
                             <label className="flex items-center gap-2 cursor-pointer">
-                                <input type="checkbox" name="roles" value="lecturer" defaultChecked />
+                                <input type="checkbox" name="roles" value="lecturer" checked={selectedRoles.includes('lecturer')} onChange={handleRoleChange} />
                                 <span className="text-sm">Lecturer</span>
                             </label>
                             <label className="flex items-center gap-2 cursor-pointer">
-                                <input type="checkbox" name="roles" value="admin" />
+                                <input type="checkbox" name="roles" value="admin" checked={selectedRoles.includes('admin')} onChange={handleRoleChange} />
                                 <span className="text-sm">Administrator</span>
                             </label>
                             <label className="flex items-center gap-2 cursor-pointer">
-                                <input type="checkbox" name="roles" value="incubator_staff" />
+                                <input type="checkbox" name="roles" value="incubator_staff" checked={selectedRoles.includes('incubator_staff')} onChange={handleRoleChange} />
                                 <span className="text-sm">Incubator Staff</span>
                             </label>
                         </div>
                     </div>
+
+                    {isTimesheetUser && (
+                        <div className="grid grid-cols-2 gap-4 animate-fade-in">
+                            <div>
+                                <label>Payment Rate (p/hr or unit)</label>
+                                <input type="number" name="hourly_rate" defaultValue="3000" required />
+                            </div>
+                            <div>
+                                <label>Payment Unit</label>
+                                <select name="payment_unit" defaultValue="hour" className="w-full">
+                                    <option value="hour">Per Hour</option>
+                                    <option value="unit">Per Unit</option>
+                                </select>
+                            </div>
+                        </div>
+                    )}
 
                     <button type="submit" disabled={loading} className="btn btn-primary mt-2" style={{ padding: '1rem' }}>
                         {loading ? "Creating..." : "Create User"}

@@ -58,52 +58,6 @@ export default async function InvoicePage() {
                 </Link>
             </div>
 
-            <div className="mt-12 mb-8">
-                <div className="page-hero" style={{ marginBottom: '1.5rem', paddingBottom: '0.5rem' }}>
-                    <h3 className="text-xl font-bold">📂 Payment History</h3>
-                    <p>Report of authorized salary and payment status</p>
-                </div>
-
-                <div className="glass-card">
-                    <div style={{ overflowX: 'auto' }}>
-                        <table className="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Period</th>
-                                    <th>Inv No</th>
-                                    <th>Amount (LKR)</th>
-                                    <th>Status</th>
-                                    <th>Submitted On</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {!userInvoices || userInvoices.length === 0 ? (
-                                    <tr>
-                                        <td colSpan="5" className="text-center py-6 text-secondary">No payment history found.</td>
-                                    </tr>
-                                ) : (
-                                    userInvoices.map(inv => (
-                                        <tr key={inv.id}>
-                                            <td className="font-semibold">{inv.month} {inv.year}</td>
-                                            <td className="text-xs font-mono">{String(inv.month_no || 0).padStart(2, '0')}</td>
-                                            <td className="font-bold">{(inv.amount || 0).toLocaleString()}</td>
-                                            <td>
-                                                <span className={`badge ${inv.status === 'approved' ? 'badge-success' : 'badge-warning'}`}>
-                                                    {inv.status?.toUpperCase()}
-                                                </span>
-                                            </td>
-                                            <td className="text-xs text-secondary">
-                                                {new Date(inv.created_at).toLocaleDateString()}
-                                            </td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
             <InvoiceGenerator
                 entries={entries || []}
                 lecturers={lecturers || []}

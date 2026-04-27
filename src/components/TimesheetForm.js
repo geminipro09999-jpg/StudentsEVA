@@ -97,6 +97,18 @@ export default function TimesheetForm({ entries, lecturerName }) {
                 </form>
             </div>
 
+            {/* Workflow Tip */}
+            <div className="glass-card mb-4 p-4" style={{ background: 'rgba(99,102,241,0.06)', borderColor: 'rgba(99,102,241,0.2)' }}>
+                <p className="text-xs font-bold uppercase tracking-wider text-secondary mb-2">📌 How the Invoice Flow Works</p>
+                <div className="flex gap-6 flex-wrap text-sm">
+                    <span><strong>1.</strong> Log hours below (daily)</span>
+                    <span style={{ color: 'var(--text-tertiary)' }}>→</span>
+                    <span><strong>2.</strong> At end of month — click <em>"Submit Monthly Invoice"</em></span>
+                    <span style={{ color: 'var(--text-tertiary)' }}>→</span>
+                    <span><strong>3.</strong> Admin reviews &amp; approves → you download your invoice</span>
+                </div>
+            </div>
+
             {/* History */}
             <div className="glass-card">
                 <div className="flex justify-between items-center mb-4">

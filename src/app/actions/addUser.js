@@ -30,25 +30,25 @@ export async function addUser(formData) {
             name: formData.get("name"),
             email: email,
             password: hashedPassword,
-            role: roles[0], // For legacy support
-            roles: roles     // New multi-role support
+            role: roles[0],
+            roles: roles,
+            hourly_rate: formData.get("hourly_rate") ? Number(formData.get("hourly_rate")) : 3000,
+            payment_unit: formData.get("payment_unit") || 'hour'
         };
 
         const { error } = await supabase.from('users').insert(insertData);
 
         if (error) {
-            // Fallback: If 'roles' column doesn't exist, try inserting without it
-            if (error.code === '42703' || error.message.includes('roles')) {
-                const { error: fallbackError } = await supabase.from('users').insert({
-                    name: formData.get("name"),
-                    email: email,
-                    password: hashedPassword,
-                    role: roles[0]
-                });
-                if (fallbackError) return { error: fallbackError.message };
-            } else {
-                return { error: error.message };
-            }
+            // Fallback for if columns are missing
+            const fallbackData = {
+                name: formData.get("name"),
+                email: email,
+                password: hashedPassword,
+                role: roles[0],
+                roles: roles
+            };
+            const { error: fallbackError } = await supabase.from('users').insert(fallbackData);
+            if (fallbackError) return { error: fallbackError.message };
         }
 
         revalidatePath("/users");

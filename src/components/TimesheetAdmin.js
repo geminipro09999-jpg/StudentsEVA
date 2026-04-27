@@ -162,7 +162,7 @@ export default function TimesheetAdmin({ entries, lecturers }) {
                                             <td className="text-center">
                                                 <input type="checkbox" checked={selected.has(e.id)} onChange={() => toggle(e.id)} />
                                             </td>
-                                            <td className="font-bold text-primary">{lecturerMap[e.lecturer_id] || 'Unknown'}</td>
+                                            <td className="font-bold text-primary">{e.users?.name || lecturerMap[e.lecturer_id] || 'Unknown'}</td>
                                             <td className="whitespace-nowrap">
                                                 {new Date(e.work_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
                                             </td>

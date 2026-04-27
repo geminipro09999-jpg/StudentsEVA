@@ -2,12 +2,14 @@
 
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
-import { updateProfile, getProfile } from "@/app/actions/profileActions";
+import { updateProfile, getProfile, updateMyPassword } from "@/app/actions/profileActions";
 import toast from "react-hot-toast";
 
 export default function ProfilePage() {
     const { data: session, update } = useSession();
     const [loading, setLoading] = useState(false);
+    const [passwordLoading, setPasswordLoading] = useState(false);
+    const [newPassword, setNewPassword] = useState("");
     const [formData, setFormData] = useState({
         address: "",
         phone: "",
@@ -63,6 +65,19 @@ export default function ProfilePage() {
         setLoading(false);
     };
 
+    const handlePasswordSubmit = async (e) => {
+        e.preventDefault();
+        setPasswordLoading(true);
+        const res = await updateMyPassword(session.user.id, newPassword);
+        if (res.success) {
+            toast.success("Password updated successfully! Next login will require this new password.");
+            setNewPassword("");
+        } else {
+            toast.error(res.error || "Failed to update password");
+        }
+        setPasswordLoading(false);
+    };
+
     if (!session) return <div className="container mt-8 text-center">Please login to view profile.</div>;
 
     return (
@@ -115,25 +130,51 @@ export default function ProfilePage() {
                     </button>
                 </form>
 
-                <div className="glass-card">
-                    <h3 className="text-xl font-bold mb-6 text-accent">Bank Details (for Invoicing)</h3>
-                    <div className="flex flex-col gap-4">
-                        <div>
-                            <label>Account Holder Name</label>
-                            <input type="text" name="account_name" value={formData.account_name} onChange={handleChange} placeholder="Full Name on Bank Account" />
+                <div className="flex flex-col gap-8">
+                    <div className="glass-card">
+                        <h3 className="text-xl font-bold mb-6 text-accent">Bank Details (for Invoicing)</h3>
+                        <div className="flex flex-col gap-4">
+                            <div>
+                                <label>Account Holder Name</label>
+                                <input type="text" name="account_name" value={formData.account_name} onChange={handleChange} placeholder="Full Name on Bank Account" />
+                            </div>
+                            <div>
+                                <label>Bank Name</label>
+                                <input type="text" name="bank_name" value={formData.bank_name} onChange={handleChange} placeholder="e.g. Bank of Ceylon" />
+                            </div>
+                            <div>
+                                <label>Account Number</label>
+                                <input type="text" name="account_no" value={formData.account_no} onChange={handleChange} placeholder="XXXXXXXXXX" />
+                            </div>
+                            <div>
+                                <label>Branch</label>
+                                <input type="text" name="branch" value={formData.branch} onChange={handleChange} placeholder="e.g. Jaffna Main Branch" />
+                            </div>
                         </div>
-                        <div>
-                            <label>Bank Name</label>
-                            <input type="text" name="bank_name" value={formData.bank_name} onChange={handleChange} placeholder="e.g. Bank of Ceylon" />
-                        </div>
-                        <div>
-                            <label>Account Number</label>
-                            <input type="text" name="account_no" value={formData.account_no} onChange={handleChange} placeholder="XXXXXXXXXX" />
-                        </div>
-                        <div>
-                            <label>Branch</label>
-                            <input type="text" name="branch" value={formData.branch} onChange={handleChange} placeholder="e.g. Jaffna Main Branch" />
-                        </div>
+                    </div>
+
+                    <div className="glass-card border-l-4 border-danger">
+                        <h3 className="text-xl font-bold mb-6 text-danger flex items-center gap-2">
+                            <span>🔒</span> Security Settings
+                        </h3>
+                        <form onSubmit={handlePasswordSubmit} className="flex flex-col gap-4">
+                            <div>
+                                <label>Set New Password</label>
+                                <input
+                                    type="password"
+                                    value={newPassword}
+                                    onChange={(e) => setNewPassword(e.target.value)}
+                                    placeholder="Enter new password (min 6 characters)"
+                                    required
+                                    minLength="6"
+                                    autoComplete="new-password"
+                                />
+                                <p className="text-xs text-secondary mt-1">If you update your password, your current session remains active, but you must use the new password next time.</p>
+                            </div>
+                            <button type="submit" disabled={passwordLoading || !newPassword} className="btn" style={{ background: 'var(--danger)', color: 'white', alignSelf: 'flex-start' }}>
+                                {passwordLoading ? "Updating..." : "Update Password"}
+                            </button>
+                        </form>
                     </div>
                 </div>
 

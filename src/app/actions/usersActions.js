@@ -14,17 +14,16 @@ export async function getUsers() {
             throw new Error("Unauthorized");
         }
 
-        // Try to select both role and roles. If roles column doesn't exist yet, fallback to just role.
         const { data, error } = await supabase
             .from('users')
-            .select('id, name, email, role, roles, created_at')
+            .select('id, name, email, role, roles, created_at, hourly_rate, payment_unit')
             .order('name');
 
         if (error) {
-            // Fallback for if the roles column is not in the DB yet
+            // Fallback for if the columns are not in the DB yet
             const { data: fallbackData, error: fallbackError } = await supabase
                 .from('users')
-                .select('id, name, email, role, created_at')
+                .select('id, name, email, role, roles, created_at')
                 .order('name');
 
             if (fallbackError) throw fallbackError;
@@ -42,17 +41,11 @@ export async function changeUserPassword(formData) {
     try {
         const session = await getServerSession(authOptions);
         const isAdmin = session?.user?.roles?.includes('admin') || session?.user?.role === 'admin';
+        if (!session || !isAdmin) throw new Error("Unauthorized");
 
-        if (!session || !isAdmin) {
-            throw new Error("Unauthorized");
-        }
-
-        const userId = formData.get("userId");
-        const newPassword = formData.get("newPassword");
-
-        if (!newPassword || newPassword.length < 6) {
-            throw new Error("Password must be at least 6 characters long.");
-        }
+        const userId = formData.get('userId');
+        const newPassword = formData.get('newPassword');
+        if (!userId || !newPassword) throw new Error("Missing required fields");
 
         const hashedPassword = await bcrypt.hash(newPassword, 10);
 
@@ -66,11 +59,12 @@ export async function changeUserPassword(formData) {
         revalidatePath("/users");
         return { success: true };
     } catch (error) {
+        console.error("changeUserPassword error:", error);
         return { error: error.message };
     }
 }
 
-export async function updateUserRoles(userId, roles) {
+export async function updateUserRoles(userId, roles, paymentInfo = {}) {
     try {
         const session = await getServerSession(authOptions);
         const isAdmin = session?.user?.roles?.includes('admin') || session?.user?.role === 'admin';
@@ -83,10 +77,11 @@ export async function updateUserRoles(userId, roles) {
             throw new Error("At least one role is required.");
         }
 
-        // Prepare update data. We update both for compatibility.
         const updateData = {
             roles: roles,
-            role: roles[0]
+            role: roles[0],
+            hourly_rate: paymentInfo.hourly_rate,
+            payment_unit: paymentInfo.payment_unit
         };
 
         const { error } = await supabase
@@ -95,13 +90,22 @@ export async function updateUserRoles(userId, roles) {
             .eq('id', userId);
 
         if (error) {
-            // If roles column doesn't exist, try just updating 'role'
+            // Fallback for if roles column doesn't exist
+            const fallbackData = {
+                role: roles[0],
+                hourly_rate: paymentInfo.hourly_rate,
+                payment_unit: paymentInfo.payment_unit
+            };
             const { error: fallbackError } = await supabase
                 .from('users')
-                .update({ role: roles[0] })
+                .update(fallbackData)
                 .eq('id', userId);
 
-            if (fallbackError) throw fallbackError;
+            if (fallbackError) {
+                // If even the second one fails, try just roles (most likely case if just rate is missing)
+                await supabase.from('users').update({ role: roles[0], roles: roles }).eq('id', userId);
+                throw fallbackError;
+            }
         }
 
         revalidatePath("/users");
