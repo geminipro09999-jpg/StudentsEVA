@@ -140,6 +140,10 @@ export default function Navbar() {
                                     <span className="icon">🧾</span>
                                     <span>Review</span>
                                 </Link>
+                                <Link href="/profile" className={`bottom-nav-item ${pathname === '/profile' ? 'active' : ''}`}>
+                                    <span className="icon">👤</span>
+                                    <span>Profile</span>
+                                </Link>
                             </>
                         ) : (
                             <>
@@ -153,6 +157,10 @@ export default function Navbar() {
                                         <span>Times</span>
                                     </Link>
                                 )}
+                                <Link href="/profile" className={`bottom-nav-item ${pathname === '/profile' ? 'active' : ''}`}>
+                                    <span className="icon">👤</span>
+                                    <span>Profile</span>
+                                </Link>
                             </>
                         )}
                     </>
