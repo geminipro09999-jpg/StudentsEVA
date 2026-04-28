@@ -140,9 +140,11 @@ export default function AdminInvoicesPage() {
             // Table
             autoTable(doc, {
                 startY: 85,
-                head: [['Description', 'Total - LKR']],
+                head: [['Quantity', 'Description', 'Unit Price', 'Total - LKR']],
                 body: [[
+                    inv.invoiceType === 'fixed' ? '1.00 Unit' : `${(inv.invoice_data?.totalHours || 0).toFixed(2)} Hrs`,
                     inv.invoice_data?.description || `Consultation and development services for the month of ${inv.month} ${inv.year}`,
+                    (inv.invoice_data?.hourlyRate || 0).toLocaleString(),
                     currentBase.toLocaleString()
                 ]],
                 theme: 'grid',
@@ -157,7 +159,8 @@ export default function AdminInvoicesPage() {
                     textColor: [0, 0, 0],
                     lineWidth: 0.1,
                     lineColor: [200, 200, 200]
-                }
+                },
+                columnStyles: { 0: { cellWidth: 25 }, 1: { cellWidth: 'auto' }, 2: { cellWidth: 35, halign: 'right' }, 3: { cellWidth: 35, halign: 'right' } }
             });
 
             const finalY = doc.lastAutoTable.finalY + 15;

@@ -200,21 +200,13 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
             let headSummary = [];
             let bodySummary = [];
 
-            if (!isFixedInvoice) {
-                headSummary = [['Quantity', 'Description', 'Unit Price', 'Total - LKR']];
-                bodySummary = [[
-                    `${totalHours.toFixed(2)} ${currentUnit === 'hour' ? 'Hrs' : 'Units'}`,
-                    activeDescription,
-                    activeRate.toLocaleString(),
-                    grossTotal.toLocaleString()
-                ]];
-            } else {
-                headSummary = [['Description', 'Amount - LKR']];
-                bodySummary = [[
-                    activeDescription,
-                    grossTotal.toLocaleString()
-                ]];
-            }
+            headSummary = [['Quantity', 'Description', 'Unit Price', 'Total - LKR']];
+            bodySummary = [[
+                isFixedInvoice ? '1.00 Unit' : `${totalHours.toFixed(2)} ${currentUnit === 'hour' ? 'Hrs' : 'Units'}`,
+                activeDescription,
+                activeRate.toLocaleString(),
+                grossTotal.toLocaleString()
+            ]];
 
             autoTable(doc, {
                 startY: 125,
@@ -223,7 +215,7 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
                 theme: 'grid',
                 headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: 'bold', lineWidth: 0.5, lineColor: [0, 0, 0] },
                 bodyStyles: { textColor: [0, 0, 0], lineWidth: 0.1, lineColor: [200, 200, 200] },
-                columnStyles: !isFixedInvoice ? { 0: { cellWidth: 25 }, 1: { cellWidth: 'auto' }, 2: { cellWidth: 35, halign: 'right' }, 3: { cellWidth: 35, halign: 'right' } } : { 0: { cellWidth: 'auto' }, 1: { cellWidth: 40, halign: 'right' } }
+                columnStyles: { 0: { cellWidth: 25 }, 1: { cellWidth: 'auto' }, 2: { cellWidth: 35, halign: 'right' }, 3: { cellWidth: 35, halign: 'right' } }
             });
 
             const finalY = doc.lastAutoTable.finalY + 15;
