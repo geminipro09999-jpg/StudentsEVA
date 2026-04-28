@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { getUsers } from "@/app/actions/usersActions";
 import ChangePasswordModal from "@/components/ChangePasswordModal";
 import EditRolesModal from "@/components/EditRolesModal";
+import EditNameModal from "@/components/EditNameModal";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
@@ -13,6 +14,7 @@ export default function UsersPage() {
     const [error, setError] = useState("");
     const [selectedUser, setSelectedUser] = useState(null);
     const [editingRolesUser, setEditingRolesUser] = useState(null);
+    const [editingNameUser, setEditingNameUser] = useState(null);
     const { data: session, status } = useSession();
     const router = useRouter();
 
@@ -110,6 +112,13 @@ export default function UsersPage() {
                                         >
                                             Edit Roles
                                         </button>
+                                        <button
+                                            onClick={() => setEditingNameUser(u)}
+                                            className="btn btn-secondary"
+                                            style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem', background: 'rgba(250,204,21,0.1)', color: '#facc15', border: '1px solid #facc15' }}
+                                        >
+                                            ✏️ Edit Name
+                                        </button>
                                     </td>
                                 </tr>
                             ))}
@@ -133,6 +142,16 @@ export default function UsersPage() {
                     user={editingRolesUser}
                     onClose={() => {
                         setEditingRolesUser(null);
+                        fetchUsers();
+                    }}
+                />
+            )}
+
+            {editingNameUser && (
+                <EditNameModal
+                    user={editingNameUser}
+                    onClose={() => {
+                        setEditingNameUser(null);
                         fetchUsers();
                     }}
                 />

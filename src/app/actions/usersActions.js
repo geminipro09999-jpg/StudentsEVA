@@ -114,3 +114,25 @@ export async function updateUserRoles(userId, roles, paymentInfo = {}) {
         return { error: error.message };
     }
 }
+
+export async function updateUserName(userId, newName) {
+    try {
+        const session = await getServerSession(authOptions);
+        const isAdmin = session?.user?.roles?.includes('admin') || session?.user?.role === 'admin';
+        if (!session || !isAdmin) throw new Error("Unauthorized");
+
+        if (!userId || !newName?.trim()) throw new Error("User ID and name are required.");
+
+        const { error } = await supabase
+            .from('users')
+            .update({ name: newName.trim() })
+            .eq('id', userId);
+
+        if (error) throw error;
+
+        return { success: true };
+    } catch (error) {
+        console.error("updateUserName error:", error);
+        return { error: error.message };
+    }
+}

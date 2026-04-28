@@ -34,39 +34,9 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
     const isStaffRole = userRoles.includes('incubator_staff');
     const initialIsAdminAccount = userRoles.some(r => ['admin', 'administrator'].includes(r));
 
-    // Support dynamic hourly rate from user profile, admin can override
-    const currentRate = Number(manualRate) || lecturerInfo?.hourly_rate || 3000;
-    const currentUnit = lecturerInfo?.payment_unit || 'hour';
-
-    const activeInvoiceType = (!isLecturerRole && isStaffRole) ? 'fixed' : ((!isStaffRole && isLecturerRole) ? 'timesheet' : invoiceType);
-    const isFixedInvoice = activeInvoiceType === 'fixed';
-
-    const filteredEntries = useMemo(() => {
-        return (entries || []).filter(e => {
-            if (e.status !== 'approved') return false;
-            // Only show entries for the selected person
-            if (selectedLecturer && e.lecturer_id !== selectedLecturer) return false;
-            const d = new Date(e.work_date);
-            if (selectedMonth && (d.getMonth() + 1) !== Number(selectedMonth)) return false;
-            if (selectedYear && d.getFullYear() !== Number(selectedYear)) return false;
-            return true;
-        }).sort((a, b) => new Date(a.work_date) - new Date(b.work_date));
-    }, [entries, selectedLecturer, selectedMonth, selectedYear]);
-
-    const totalHours = filteredEntries.reduce((s, e) => s + Number(e.hours), 0);
-
-    // Salary calculation using dynamic rate
-    const calculatedGross = totalHours * currentRate;
-
     const monthName = MONTH_NAMES[Number(selectedMonth)] || '';
     const periodLabel = `${monthName} ${selectedYear}`;
-    const invoiceNo = String(selectedMonth).padStart(2, '0');
-
-    const availableYears = useMemo(() => {
-        const years = [...new Set((entries || []).map(e => new Date(e.work_date).getFullYear()))].sort((a, b) => b - a);
-        if (years.length === 0) years.push(currentDate.getFullYear());
-        return years;
-    }, [entries]);
+    const invoiceNo = `INV-${selectedYear}${String(selectedMonth).padStart(2, '0')}-${(selectedLecturer || '').slice(0, 6).toUpperCase()}`;
 
     const existingInvoice = useMemo(() => {
         return invoices.find(inv =>
@@ -76,9 +46,41 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
         );
     }, [invoices, monthName, selectedYear, selectedLecturer, initialIsAdmin]);
 
-    // Use existing approved amount for fixed invoices, otherwise use calculated total
-    const grossTotal = isFixedInvoice ? Number(existingInvoice?.amount || 0) : calculatedGross;
-    const finalTotal = grossTotal - Number(deduction);
+    // Prioritize snapshot values from the existing invoice if they exist
+    const activeRate = existingInvoice?.invoice_data?.hourlyRate || Number(manualRate) || lecturerInfo?.hourly_rate || 3000;
+    const currentUnit = existingInvoice?.invoice_data?.paymentUnit || lecturerInfo?.payment_unit || 'hour';
+
+    const activeInvoiceType = existingInvoice?.invoice_data?.invoiceType || ((!isLecturerRole && isStaffRole) ? 'fixed' : ((!isStaffRole && isLecturerRole) ? 'timesheet' : invoiceType));
+    const isFixedInvoice = activeInvoiceType === 'fixed';
+
+    const rawFilteredEntries = useMemo(() => {
+        return (entries || []).filter(e => {
+            if (e.status !== 'approved') return false;
+            // Only show entries for the selected person
+            if (selectedLecturer && e.lecturer_id !== selectedLecturer) return false;
+            if (e.work_date) {
+                const [year, month] = e.work_date.split('-');
+                if (selectedMonth && Number(month) !== Number(selectedMonth)) return false;
+                if (selectedYear && Number(year) !== Number(selectedYear)) return false;
+            }
+            return true;
+        }).sort((a, b) => new Date(a.work_date) - new Date(b.work_date));
+    }, [entries, selectedLecturer, selectedMonth, selectedYear]);
+
+    const filteredEntries = existingInvoice?.invoice_data?.items || rawFilteredEntries;
+    const totalHours = filteredEntries.reduce((s, e) => s + Number(e.hours), 0);
+
+    const calculatedGross = totalHours * activeRate;
+
+    const availableYears = useMemo(() => {
+        const years = [...new Set((entries || []).map(e => e.work_date ? Number(e.work_date.split('-')[0]) : null).filter(Boolean))].sort((a, b) => b - a);
+        if (years.length === 0) years.push(currentDate.getFullYear());
+        return years;
+    }, [entries]);
+
+    const grossTotal = existingInvoice ? Number(existingInvoice.amount || 0) : calculatedGross;
+    const activeDeduction = existingInvoice ? Number(existingInvoice.deductions || 0) : Number(deduction);
+    const finalTotal = grossTotal - activeDeduction;
 
     const handleLoadInvoice = (inv) => {
         const monthIndex = MONTH_NAMES.indexOf(inv.month);
@@ -92,17 +94,19 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
     const handleSubmitInvoice = async () => {
         setSubmissionLoading(true);
         const res = await submitInvoice({
+            lecturer_id: selectedLecturer,
             invoice_no: invoiceNo,
             month: monthName,
             year: selectedYear,
             amount: finalTotal,
-            deductions: deduction,
-            hourlyRate: currentRate,
+            deductions: activeDeduction,
+            hourlyRate: activeRate,
             paymentUnit: currentUnit,
             totalHours,
             items: filteredEntries,
             lecturerName: lecturerInfo?.name,
-            lecturerEmail: lecturerInfo?.staff_email || lecturerInfo?.email
+            lecturerEmail: lecturerInfo?.staff_email || lecturerInfo?.email,
+            invoiceType: activeInvoiceType
         });
 
         if (res.success) {
@@ -179,7 +183,7 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
                 bodySummary = [[
                     `${totalHours.toFixed(2)} ${currentUnit === 'hour' ? 'Hrs' : 'Units'}`,
                     `Consultation and development services for the month of ${monthName} ${selectedYear}`,
-                    currentRate.toLocaleString(),
+                    activeRate.toLocaleString(),
                     grossTotal.toLocaleString()
                 ]];
             } else {
@@ -221,16 +225,16 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
             doc.text(grossTotal.toLocaleString(), valueX, finalY, { align: 'right' });
 
             doc.text('Deduction', rightColX, finalY + 10);
-            doc.text(`-${Number(deduction).toLocaleString()}`, valueX, finalY + 10, { align: 'right' });
+            doc.text(`-${Number(activeDeduction).toLocaleString()}`, valueX, finalY + 10, { align: 'right' });
 
             doc.setFont('helvetica', 'bold');
             doc.text('GROSS TOTAL', rightColX, finalY + 25);
             doc.text(finalTotal.toLocaleString(), valueX, finalY + 25, { align: 'right' });
 
-            if (deduction > 0) {
+            if (activeDeduction > 0) {
                 doc.setFontSize(8);
                 doc.setTextColor(239, 68, 68);
-                doc.text(`(Includes deduction: -${deduction.toLocaleString()})`, 180, finalY + 34, { align: 'center' });
+                doc.text(`(Includes deduction: -${activeDeduction.toLocaleString()})`, 180, finalY + 34, { align: 'center' });
             }
 
             // 9. Signatures
@@ -355,7 +359,7 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
                         new Paragraph({ children: [new TextRun({ text: `Generated: ${new Date().toLocaleDateString()}`, size: 18, color: '999999' })], spacing: { after: 300 } }),
                         new Table({ rows: tableRows, width: { size: 100, type: WidthType.PERCENTAGE } }),
                         new Paragraph({ text: '', spacing: { before: 200 } }),
-                        new Paragraph({ children: [new TextRun({ text: `Payment Rate: ${currentRate.toLocaleString()} LKR per ${currentUnit}`, bold: true, size: 18 })] }),
+                        new Paragraph({ children: [new TextRun({ text: `Payment Rate: ${activeRate.toLocaleString()} LKR per ${currentUnit}`, bold: true, size: 18 })] }),
                         new Paragraph({ text: '', spacing: { before: 400 } }),
                         new Paragraph({ children: [new TextRun({ text: '____________________________                                              ____________________________', size: 20 })], spacing: { before: 400 } }),
                         new Paragraph({ children: [new TextRun({ text: '      Lecturer Signature                                                                   Admin Signature', size: 18, color: '666666' })] }),
@@ -408,7 +412,7 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
                                     invoices.map(inv => (
                                         <tr key={inv.id}>
                                             <td className="font-semibold">{inv.month} {inv.year}</td>
-                                            <td className="text-xs font-mono">{String(inv.month_no || 0).padStart(2, '0')}</td>
+                                            <td className="text-xs font-mono">{inv.invoice_no || String(inv.month_no || 0).padStart(2, '0')}</td>
                                             <td className="font-bold">{(inv.amount || 0).toLocaleString()}</td>
                                             <td>
                                                 <span className={`badge ${inv.status === 'approved' ? 'badge-success' : 'badge-warning'}`}>
@@ -473,7 +477,7 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
                         </div>
                     ) : (
                         <div>
-                            <p className="text-xs text-secondary font-semibold">Rate: {currentRate.toLocaleString()} / {currentUnit}</p>
+                            <p className="text-xs text-secondary font-semibold">Rate: {activeRate.toLocaleString()} / {currentUnit}</p>
                         </div>
                     )}
                     {isLecturerRole && isStaffRole && (
@@ -561,7 +565,7 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
                     </div>
 
                     {/* Summary Table */}
-                    <div className="border-t border-b border-black py-4 mb-8">
+                    <div className="border-t border-black pt-4 mb-4">
                         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                             <thead>
                                 <tr style={{ borderBottom: '1px solid black' }}>
@@ -577,12 +581,39 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
                                     <td style={{ padding: '8px' }}>
                                         {isFixedInvoice ? `Professional service fees for the month of ${monthName} ${selectedYear}` : `Consultation and development services for the month of ${monthName} ${selectedYear}`}
                                     </td>
-                                    {!isFixedInvoice && <td style={{ textAlign: 'right', padding: '8px' }}>{currentRate.toLocaleString()}</td>}
+                                    {!isFixedInvoice && <td style={{ textAlign: 'right', padding: '8px' }}>{activeRate.toLocaleString()}</td>}
                                     <td style={{ textAlign: 'right', padding: '8px' }}>{grossTotal.toLocaleString()}</td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
+
+                    {/* Timesheet Breakdown */}
+                    {!isFixedInvoice && filteredEntries.length > 0 && (
+                        <div className="border-b border-black pb-4 mb-8">
+                            <h4 className="font-bold mb-3 text-sm">Timesheet Approvals</h4>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                                <thead style={{ background: '#f8fafc' }}>
+                                    <tr style={{ borderBottom: '1px solid #cbd5e1' }}>
+                                        <th style={{ padding: '6px', textAlign: 'left' }}>Date</th>
+                                        <th style={{ padding: '6px', textAlign: 'left' }}>In Time</th>
+                                        <th style={{ padding: '6px', textAlign: 'left' }}>Out Time</th>
+                                        <th style={{ padding: '6px', textAlign: 'right' }}>Hours</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {filteredEntries.map((entry, index) => (
+                                        <tr key={index} style={{ borderBottom: index < filteredEntries.length - 1 ? '1px solid #e2e8f0' : 'none' }}>
+                                            <td style={{ padding: '6px' }}>{new Date(entry.work_date).toLocaleDateString('en-GB')}</td>
+                                            <td style={{ padding: '6px' }}>{entry.in_time?.slice(0, 5)}</td>
+                                            <td style={{ padding: '6px' }}>{entry.out_time?.slice(0, 5)}</td>
+                                            <td style={{ padding: '6px', textAlign: 'right' }}>{Number(entry.hours).toFixed(2)}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
 
                     {/* Lower Section */}
                     <div className="flex justify-between gap-8">
@@ -600,7 +631,7 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
                             </div>
                             <div className="flex justify-between py-1 text-sm border-b border-black/10">
                                 <span className="font-medium">Deduction</span>
-                                <span>-{Number(deduction).toLocaleString()}</span>
+                                <span>-{Number(activeDeduction).toLocaleString()}</span>
                             </div>
                             <div className="flex justify-between py-4 font-bold text-lg mt-2">
                                 <span>GROSS TOTAL</span>

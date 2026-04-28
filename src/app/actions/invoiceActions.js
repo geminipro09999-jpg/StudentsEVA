@@ -12,11 +12,13 @@ export async function submitInvoice(invoiceData) {
         const session = await getServerSession(authOptions);
         if (!session) throw new Error("Unauthorized");
 
+        const targetUserId = invoiceData.lecturer_id || session.user.id;
+
         // Check if invoice already exists for this user+month+year
         const { data: existing } = await supabase
             .from('invoices')
             .select('id')
-            .eq('user_id', session.user.id)
+            .eq('user_id', targetUserId)
             .eq('month', invoiceData.month)
             .eq('year', invoiceData.year)
             .maybeSingle();
@@ -39,7 +41,7 @@ export async function submitInvoice(invoiceData) {
             ({ error } = await supabase
                 .from('invoices')
                 .insert({
-                    user_id: session.user.id,
+                    user_id: targetUserId,
                     invoice_no: invoiceData.invoice_no,
                     month: invoiceData.month,
                     year: invoiceData.year,
