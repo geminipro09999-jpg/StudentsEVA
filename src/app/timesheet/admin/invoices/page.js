@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getAllInvoices, approveInvoice, updateInvoiceData } from "@/app/actions/invoiceActions";
+import { approveInvoice, updateInvoiceData } from "@/app/actions/invoiceActions";
+import { supabase } from "@/lib/supabase";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
@@ -34,20 +35,26 @@ export default function AdminInvoicesPage() {
 
     async function fetchInvoices() {
         setLoading(true);
-        const res = await getAllInvoices();
-        if (res.error) {
-            setError(res.error);
-        } else {
-            setInvoices(res.data);
-            // Initialize maps
+        setError("");
+        try {
+            const { data, error } = await supabase
+                .from('invoices')
+                .select('*, users(name, email, staff_email, address, phone, account_name, bank_name, account_no, branch, e_signature)')
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+
+            setInvoices(data || []);
             const dMap = {};
             const bMap = {};
-            res.data.forEach(inv => {
+            (data || []).forEach(inv => {
                 dMap[inv.id] = inv.deductions || 0;
                 bMap[inv.id] = inv.amount || 0;
             });
             setDeductionsMap(dMap);
             setBaseAmtMap(bMap);
+        } catch (err) {
+            setError(err.message);
         }
         setLoading(false);
     }
@@ -94,7 +101,7 @@ export default function AdminInvoicesPage() {
         setBaseAmtMap(prev => ({ ...prev, [id]: val }));
     };
 
-    const exportPDF = (inv) => {
+    const exportPDF = (inv, isPreview = false) => {
         try {
             const doc = new jsPDF();
             const currentBase = Number(baseAmtMap[inv.id] || 0);
@@ -117,7 +124,7 @@ export default function AdminInvoicesPage() {
             doc.setFontSize(10);
             doc.text([
                 `Email: ${staff.staff_email || staff.email}`,
-                `Invoice No: ${inv.invoice_no || String(inv.month_no || new Date(`${inv.month} 1, ${inv.year}`).getMonth() + 1).padStart(2, '0')}`,
+                `Invoice No: INV-${String(inv.month_no || new Date(`${inv.month} 1, ${inv.year}`).getMonth() + 1).padStart(2, '0')}`,
                 `Date: 15/${String(inv.month_no || new Date(`${inv.month} 1, ${inv.year}`).getMonth() + 1).padStart(2, '0')}/${inv.year}`,
                 `Period: ${inv.month} ${inv.year}`
             ], 20, 58);
@@ -135,7 +142,7 @@ export default function AdminInvoicesPage() {
                 startY: 85,
                 head: [['Description', 'Total - LKR']],
                 body: [[
-                    `Professional service fees for the month of ${inv.month} ${inv.year}`,
+                    inv.invoice_data?.description || `Consultation and development services for the month of ${inv.month} ${inv.year}`,
                     currentBase.toLocaleString()
                 ]],
                 theme: 'grid',
@@ -194,9 +201,15 @@ export default function AdminInvoicesPage() {
                 }
             }
 
-            const fileName = `${staff.name} ${inv.month} ${inv.invoice_no || String(inv.month_no || new Date(`${inv.month} 1, ${inv.year}`).getMonth() + 1).padStart(2, '0')}.pdf`;
-            doc.save(fileName);
-            toast.success("Final PDF generated!");
+            if (isPreview) {
+                const blob = doc.output('blob');
+                const url = URL.createObjectURL(blob);
+                window.open(url, '_blank');
+            } else {
+                const fileName = `${staff.name} ${inv.month} INV-${String(inv.month_no || new Date(`${inv.month} 1, ${inv.year}`).getMonth() + 1).padStart(2, '0')}.pdf`;
+                doc.save(fileName);
+                toast.success("Final PDF generated!");
+            }
         } catch (err) {
             console.error(err);
             toast.error("Failed to generate PDF");
@@ -279,13 +292,17 @@ export default function AdminInvoicesPage() {
                 }));
                 const updatedInvoicesList = invoices.map(i => i.id === selectedInvoice.id ? { ...i, amount: calculatedGross, invoice_data: updatedData } : i);
                 setInvoices(updatedInvoicesList);
+                return true;
             } else {
                 toast.error(res.error || "Failed to save corrections");
+                return false;
             }
         } catch (e) {
             toast.error("An error occurred preserving corrections");
+            return false;
+        } finally {
+            setIsSavingCorrections(false);
         }
-        setIsSavingCorrections(false);
     };
 
     if (loading) return <div className="container mt-8 text-center">Loading invoices...</div>;
@@ -329,7 +346,7 @@ export default function AdminInvoicesPage() {
                                             <div className="text-xs text-secondary">{inv.users?.staff_email || inv.users?.email}</div>
                                         </td>
                                         <td>{inv.month} {inv.year}</td>
-                                        <td className="text-xs font-mono">{inv.invoice_no || String(inv.month_no || new Date(`${inv.month} 1, ${inv.year}`).getMonth() + 1).padStart(2, '0')}</td>
+                                        <td className="text-xs font-mono">INV-{String(inv.month_no || new Date(`${inv.month} 1, ${inv.year}`).getMonth() + 1).padStart(2, '0')}</td>
                                         <td>
                                             <input
                                                 type="number"
@@ -390,15 +407,47 @@ export default function AdminInvoicesPage() {
                                                         </button>
                                                     </>
                                                 )}
+                                                {(inv.status === 'approved' || inv.status === 'rejected') && (
+                                                    <button
+                                                        onClick={async () => {
+                                                            if (!confirm("Are you sure you want to Re-Open this invoice? It will become 'Pending' again for edits.")) return;
+                                                            setUpdatingId(inv.id);
+                                                            const res = await approveInvoice(inv.id, {
+                                                                status: 'pending',
+                                                                amount: Number(baseAmtMap[inv.id] || 0),
+                                                                deductions: Number(deductionsMap[inv.id] || 0)
+                                                            });
+                                                            if (res.success) {
+                                                                toast.success("Invoice Re-Opened!");
+                                                                fetchInvoices();
+                                                            } else {
+                                                                toast.error(res.error || "Failed to re-open invoice");
+                                                            }
+                                                            setUpdatingId(null);
+                                                        }}
+                                                        disabled={updatingId === inv.id}
+                                                        className="btn btn-secondary px-3 py-1 text-xs text-amber-600 border-amber-200 bg-amber-50"
+                                                        title="Change back to Pending"
+                                                    >
+                                                        ↻ Re-open
+                                                    </button>
+                                                )}
                                                 <button
                                                     onClick={() => openDetails(inv)}
                                                     className="btn btn-secondary px-3 py-1 text-xs"
-                                                    title="View Breakdown"
+                                                    title="View Breakdown & Edit"
                                                 >
                                                     🔍 Details
                                                 </button>
                                                 <button
-                                                    onClick={() => exportPDF(inv)}
+                                                    onClick={() => exportPDF(inv, true)}
+                                                    className="btn btn-secondary px-3 py-1 text-xs"
+                                                    title="Preview PDF in Browser"
+                                                >
+                                                    👁️ Preview
+                                                </button>
+                                                <button
+                                                    onClick={() => exportPDF(inv, false)}
                                                     className="btn btn-secondary px-3 py-1 text-xs"
                                                     title="Download PDF"
                                                 >
@@ -504,7 +553,15 @@ export default function AdminInvoicesPage() {
                                         <tbody className="divide-y divide-card-border">
                                             {editingItems.map((item, idx) => (
                                                 <tr key={idx} className="hover:bg-secondary/5 transition-colors group">
-                                                    <td className="p-3 whitespace-nowrap">{new Date(item.work_date).toLocaleDateString()}</td>
+                                                    <td className="p-3 whitespace-nowrap">
+                                                        <input
+                                                            type="date"
+                                                            value={item.work_date ? new Date(item.work_date).toISOString().split('T')[0] : ''}
+                                                            onChange={e => handleItemChange(idx, 'work_date', e.target.value)}
+                                                            disabled={selectedInvoice.status !== 'pending'}
+                                                            className="bg-transparent border border-card-border rounded px-2 py-1 text-xs w-32 focus:border-primary disabled:opacity-50"
+                                                        />
+                                                    </td>
                                                     <td className="p-3 flex items-center gap-2">
                                                         <input
                                                             type="time"
@@ -560,14 +617,18 @@ export default function AdminInvoicesPage() {
                             <button onClick={closeDetails} className="btn btn-secondary">Close Window</button>
                             {selectedInvoice.status === 'pending' && (
                                 <button
-                                    onClick={() => {
-                                        handleApprove(selectedInvoice.id);
-                                        closeDetails();
+                                    onClick={async () => {
+                                        const saved = await handleSaveCorrections();
+                                        if (saved !== false) {
+                                            handleApprove(selectedInvoice.id);
+                                            closeDetails();
+                                        }
                                     }}
                                     className="btn btn-primary"
                                     style={{ background: '#10b981' }}
+                                    disabled={isSavingCorrections || updatingId === selectedInvoice.id}
                                 >
-                                    Approve & Close
+                                    {isSavingCorrections ? "Saving..." : "Approve & Close"}
                                 </button>
                             )}
                         </div>

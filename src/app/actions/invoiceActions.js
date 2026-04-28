@@ -17,7 +17,7 @@ export async function submitInvoice(invoiceData) {
         // Check if invoice already exists for this user+month+year
         const { data: existing } = await supabase
             .from('invoices')
-            .select('id')
+            .select('id, status')
             .eq('user_id', targetUserId)
             .eq('month', invoiceData.month)
             .eq('year', invoiceData.year)
@@ -25,7 +25,10 @@ export async function submitInvoice(invoiceData) {
 
         let error;
         if (existing) {
-            // Update existing invoice (only if still pending)
+            if (existing.status === 'approved') {
+                throw new Error("This invoice is already approved and cannot be overwritten. Contact an admin if you need it reopened.");
+            }
+            // Update existing invoice (pending or rejected back to pending)
             ({ error } = await supabase
                 .from('invoices')
                 .update({
@@ -34,8 +37,7 @@ export async function submitInvoice(invoiceData) {
                     invoice_data: invoiceData,
                     status: 'pending'
                 })
-                .eq('id', existing.id)
-                .eq('status', 'pending')); // Don't overwrite approved invoices
+                .eq('id', existing.id));
         } else {
             // Insert new invoice
             ({ error } = await supabase
@@ -54,6 +56,7 @@ export async function submitInvoice(invoiceData) {
         if (error) throw error;
 
         revalidatePath("/timesheet/invoice");
+        revalidatePath("/timesheet/admin/invoices");
         return { success: true };
     } catch (error) {
         console.error("submitInvoice error:", error);
@@ -79,13 +82,14 @@ export async function approveInvoice(invoiceId, update) {
                 status: update.status,
                 amount: update.amount,
                 deductions: update.deductions || 0,
-                updated_at: new Date()
+                updated_at: new Date().toISOString()
             })
             .eq('id', invoiceId);
 
         if (error) throw error;
 
         revalidatePath("/timesheet/admin/invoices");
+        revalidatePath("/timesheet/invoice");
         return { success: true };
     } catch (error) {
         console.error("approveInvoice error:", error);
@@ -133,13 +137,14 @@ export async function updateInvoiceData(invoiceId, updatedData) {
             .update({
                 invoice_data: updatedData,
                 amount: updatedData.calculatedGross || updatedData.amount, // Sync amount if available
-                updated_at: new Date()
+                updated_at: new Date().toISOString()
             })
             .eq('id', invoiceId);
 
         if (error) throw error;
 
         revalidatePath("/timesheet/admin/invoices");
+        revalidatePath("/timesheet/invoice");
         return { success: true };
     } catch (error) {
         console.error("updateInvoiceData error:", error);

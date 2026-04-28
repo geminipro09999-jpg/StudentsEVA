@@ -16,8 +16,9 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
     const [selectedLecturer, setSelectedLecturer] = useState(initialIsAdmin ? '' : (currentUserId || ''));
     const [selectedMonth, setSelectedMonth] = useState(String(currentDate.getMonth() + 1));
     const [selectedYear, setSelectedYear] = useState(String(currentDate.getFullYear()));
-    const [deduction, setDeduction] = useState(0);
     const [manualRate, setManualRate] = useState('');
+    const [invoiceDescription, setInvoiceDescription] = useState('');
+    const [deduction, setDeduction] = useState(0);
     const [submissionLoading, setSubmissionLoading] = useState(false);
     const [isSubmitted, setIsSubmitted] = useState(false);
     const [invoiceType, setInvoiceType] = useState('timesheet');
@@ -36,7 +37,8 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
 
     const monthName = MONTH_NAMES[Number(selectedMonth)] || '';
     const periodLabel = `${monthName} ${selectedYear}`;
-    const invoiceNo = `INV-${selectedYear}${String(selectedMonth).padStart(2, '0')}-${(selectedLecturer || '').slice(0, 6).toUpperCase()}`;
+    const dbInvoiceNo = `INV-${selectedYear}${String(selectedMonth).padStart(2, '0')}-${(selectedLecturer || '').slice(0, 6).toUpperCase()}`;
+    const displayInvoiceNo = `INV-${String(selectedMonth).padStart(2, '0')}`;
 
     const existingInvoice = useMemo(() => {
         return invoices.find(inv =>
@@ -52,6 +54,8 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
 
     const activeInvoiceType = existingInvoice?.invoice_data?.invoiceType || ((!isLecturerRole && isStaffRole) ? 'fixed' : ((!isStaffRole && isLecturerRole) ? 'timesheet' : invoiceType));
     const isFixedInvoice = activeInvoiceType === 'fixed';
+    const defaultDescription = `Consultation and development services for the month of ${periodLabel}`;
+    const activeDescription = existingInvoice?.invoice_data?.description || invoiceDescription || defaultDescription;
 
     const rawFilteredEntries = useMemo(() => {
         return (entries || []).filter(e => {
@@ -79,7 +83,7 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
     }, [entries]);
 
     const grossTotal = existingInvoice ? Number(existingInvoice.amount || 0) : calculatedGross;
-    const activeDeduction = existingInvoice ? Number(existingInvoice.deductions || 0) : Number(deduction);
+    const activeDeduction = existingInvoice ? Number(existingInvoice.deductions || 0) : 0;
     const finalTotal = grossTotal - activeDeduction;
 
     const handleLoadInvoice = (inv) => {
@@ -87,26 +91,38 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
         if (monthIndex > 0) setSelectedMonth(String(monthIndex));
         setSelectedYear(String(inv.year));
         if (initialIsAdmin && inv.user_id) setSelectedLecturer(inv.user_id);
+        setInvoiceDescription(inv.invoice_data?.description || '');
 
         toast.success(`Loaded data for ${inv.month} ${inv.year}. Scroll down to preview/download.`);
     };
 
     const handleSubmitInvoice = async () => {
         setSubmissionLoading(true);
+
+        // Use fresh raw data in case the user added timesheets after initially submitting
+        const freshTotalHours = rawFilteredEntries.reduce((s, e) => s + Number(e.hours), 0);
+        const freshRate = Number(manualRate) || lecturerInfo?.hourly_rate || 3000;
+        const freshGross = freshTotalHours * freshRate;
+        const freshDeduction = existingInvoice ? Number(existingInvoice.deductions || 0) : 0;
+        const freshFinalTotal = freshGross - freshDeduction;
+        const freshPaymentUnit = lecturerInfo?.payment_unit || 'hour';
+        const freshInvoiceType = (!isLecturerRole && isStaffRole) ? 'fixed' : ((!isStaffRole && isLecturerRole) ? 'timesheet' : invoiceType);
+
         const res = await submitInvoice({
             lecturer_id: selectedLecturer,
-            invoice_no: invoiceNo,
+            invoice_no: dbInvoiceNo,
             month: monthName,
             year: selectedYear,
-            amount: finalTotal,
-            deductions: activeDeduction,
-            hourlyRate: activeRate,
-            paymentUnit: currentUnit,
-            totalHours,
-            items: filteredEntries,
+            amount: freshFinalTotal,
+            deductions: freshDeduction,
+            hourlyRate: freshRate,
+            paymentUnit: freshPaymentUnit,
+            totalHours: freshTotalHours,
+            items: rawFilteredEntries,
             lecturerName: lecturerInfo?.name,
             lecturerEmail: lecturerInfo?.staff_email || lecturerInfo?.email,
-            invoiceType: activeInvoiceType
+            invoiceType: freshInvoiceType,
+            description: activeDescription
         });
 
         if (res.success) {
@@ -145,14 +161,20 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
             doc.setFontSize(11);
             doc.setTextColor(0, 0, 0);
             doc.setFont('helvetica', 'bold');
-            doc.text(lecturerInfo?.name || 'Name', 20, 50);
+            doc.text(`Name : ${lecturerInfo?.name || 'Your Name'}`, 20, 50);
 
             doc.setFont('helvetica', 'normal');
             doc.setFontSize(10);
+            const addressText = lecturerInfo?.address || '';
+            const addressLines = addressText.split('\n').filter(l => l.trim() !== '');
+            const combinedLines = addressLines.length > 0
+                ? [`Address : ${addressLines[0]}`, ...addressLines.slice(1)]
+                : ['Address : '];
+
             doc.text([
-                lecturerInfo?.address || 'Address',
-                `Tel: ${lecturerInfo?.phone || 'Tel'}`,
-                `Email: ${lecturerInfo?.staff_email || lecturerInfo?.email || 'Email'}`
+                ...combinedLines,
+                `Tel: ${lecturerInfo?.phone || '-'}`,
+                `Email: ${lecturerInfo?.staff_email || lecturerInfo?.email}`
             ], 20, 58);
 
             // 3. Invoice Meta (Top Right)
@@ -161,7 +183,7 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
             doc.text(`Date :`, 140, 72);
 
             doc.setFont('helvetica', 'normal');
-            doc.text(invoiceNo, 175, 58);
+            doc.text(displayInvoiceNo, 175, 58);
             doc.text(`15/${String(selectedMonth).padStart(2, '0')}/${selectedYear}`, 175, 72);
 
             // 4. Client Info (Middle Left)
@@ -182,14 +204,14 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
                 headSummary = [['Quantity', 'Description', 'Unit Price', 'Total - LKR']];
                 bodySummary = [[
                     `${totalHours.toFixed(2)} ${currentUnit === 'hour' ? 'Hrs' : 'Units'}`,
-                    `Consultation and development services for the month of ${monthName} ${selectedYear}`,
+                    activeDescription,
                     activeRate.toLocaleString(),
                     grossTotal.toLocaleString()
                 ]];
             } else {
-                headSummary = [['Description', 'Total - LKR']];
+                headSummary = [['Description', 'Amount - LKR']];
                 bodySummary = [[
-                    `Professional service fees for the month of ${monthName} ${selectedYear}`,
+                    activeDescription,
                     grossTotal.toLocaleString()
                 ]];
             }
@@ -282,47 +304,27 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
             const tableRows = !isFixedInvoice ? [
                 new TableRow({
                     tableHeader: true,
-                    children: ['#', 'Date', 'In Time', 'Out Time', 'Hours'].map(h =>
+                    children: ['Quantity', 'Description', 'Unit Price', 'Total - LKR'].map(h =>
                         new TableCell({
-                            children: [new Paragraph({ children: [new TextRun({ text: h, bold: true, size: 20, color: 'FFFFFF' })], alignment: AlignmentType.CENTER })],
+                            children: [new Paragraph({ children: [new TextRun({ text: h, bold: true, size: 20, color: 'FFFFFF' })], alignment: h === 'Description' || h === 'Quantity' ? AlignmentType.LEFT : AlignmentType.RIGHT })],
                             shading: { fill: '6366F1' },
                             borders: headerBorder,
-                            width: { size: h === '#' ? 8 : 23, type: WidthType.PERCENTAGE },
                         })
                     ),
                 }),
-                ...filteredEntries.map((e, i) =>
-                    new TableRow({
-                        children: [
-                            String(i + 1),
-                            new Date(e.work_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }),
-                            e.in_time?.slice(0, 5),
-                            e.out_time?.slice(0, 5),
-                            Number(e.hours).toFixed(2),
-                        ].map((val, ci) =>
-                            new TableCell({
-                                children: [new Paragraph({ children: [new TextRun({ text: val, size: 18, bold: ci === 4 })], alignment: ci === 0 || ci === 4 ? AlignmentType.CENTER : AlignmentType.LEFT })],
-                                borders: headerBorder,
-                            })
-                        ),
-                    })
-                ),
                 new TableRow({
                     children: [
-                        ...['', '', '', 'TOTAL'].map(v =>
-                            new TableCell({
-                                children: [new Paragraph({ children: [new TextRun({ text: v, bold: true, size: 20 })], alignment: AlignmentType.RIGHT })],
-                                borders: headerBorder,
-                                shading: { fill: 'F0F0FF' },
-                            })
-                        ),
+                        `${totalHours.toFixed(2)} ${currentUnit === 'hour' ? 'Hrs' : 'Units'}`,
+                        activeDescription,
+                        activeRate.toLocaleString(),
+                        grossTotal.toLocaleString(),
+                    ].map((val, ci) =>
                         new TableCell({
-                            children: [new Paragraph({ children: [new TextRun({ text: totalHours.toFixed(2), bold: true, size: 22 })], alignment: AlignmentType.CENTER })],
+                            children: [new Paragraph({ children: [new TextRun({ text: val, size: 18 })], alignment: (ci === 2 || ci === 3) ? AlignmentType.RIGHT : AlignmentType.LEFT })],
                             borders: headerBorder,
-                            shading: { fill: 'F0F0FF' },
-                        }),
-                    ],
-                }),
+                        })
+                    ),
+                })
             ] : [
                 new TableRow({
                     tableHeader: true,
@@ -337,7 +339,7 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
                 new TableRow({
                     children: [
                         new TableCell({
-                            children: [new Paragraph({ children: [new TextRun({ text: `Professional service fees for the month of ${monthName} ${selectedYear}`, size: 18 })] })],
+                            children: [new Paragraph({ children: [new TextRun({ text: activeDescription, size: 18 })] })],
                             borders: headerBorder,
                         }),
                         new TableCell({
@@ -353,8 +355,12 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
                     children: [
                         new Paragraph({ children: [new TextRun({ text: 'TIMESHEET INVOICE', bold: true, size: 36 })], alignment: AlignmentType.CENTER, spacing: { after: 100 } }),
                         new Paragraph({ children: [new TextRun({ text: 'Student Evaluation System — UnicomTIC and Innovation Center', size: 20, color: '666666' })], alignment: AlignmentType.CENTER, spacing: { after: 300 } }),
-                        new Paragraph({ children: [new TextRun({ text: 'Lecturer: ', bold: true, size: 22 }), new TextRun({ text: lecturerInfo?.name || 'Unknown', size: 22 })], spacing: { after: 80 } }),
-                        new Paragraph({ children: [new TextRun({ text: 'Email: ', bold: true, size: 22 }), new TextRun({ text: lecturerInfo?.email || '—', size: 22 })], spacing: { after: 80 } }),
+                        new Paragraph({ children: [new TextRun({ text: `Name : ${lecturerInfo?.name || 'Your Name'}`, bold: true, size: 28, color: '6366F1' })] }),
+                        ...String(lecturerInfo?.address || 'Address').split('\n').filter(l => l.trim() !== '').map((l, i) =>
+                            new Paragraph({ children: [new TextRun({ text: i === 0 ? `Address : ${l}` : l, size: 20 })] })
+                        ),
+                        new Paragraph({ children: [new TextRun({ text: `Tel: ${lecturerInfo?.phone || '-'}`, size: 20 })] }),
+                        new Paragraph({ children: [new TextRun({ text: `Email: ${lecturerInfo?.staff_email || lecturerInfo?.email}`, size: 20 })] }),
                         new Paragraph({ children: [new TextRun({ text: 'Period: ', bold: true, size: 22 }), new TextRun({ text: periodLabel, size: 22 })], spacing: { after: 80 } }),
                         new Paragraph({ children: [new TextRun({ text: `Generated: ${new Date().toLocaleDateString()}`, size: 18, color: '999999' })], spacing: { after: 300 } }),
                         new Table({ rows: tableRows, width: { size: 100, type: WidthType.PERCENTAGE } }),
@@ -412,7 +418,7 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
                                     invoices.map(inv => (
                                         <tr key={inv.id}>
                                             <td className="font-semibold">{inv.month} {inv.year}</td>
-                                            <td className="text-xs font-mono">{inv.invoice_no || String(inv.month_no || 0).padStart(2, '0')}</td>
+                                            <td className="text-xs font-mono">INV-{String(MONTH_NAMES.indexOf(inv.month)).padStart(2, '0')}</td>
                                             <td className="font-bold">{(inv.amount || 0).toLocaleString()}</td>
                                             <td>
                                                 <span className={`badge ${inv.status === 'approved' ? 'badge-success' : 'badge-warning'}`}>
@@ -443,7 +449,9 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
                         <label>Member Name *</label>
                         <select
                             value={selectedLecturer}
-                            onChange={e => setSelectedLecturer(e.target.value)}
+                            onChange={e => {
+                                setSelectedLecturer(e.target.value);
+                            }}
                             style={{ width: '100%' }}
                             disabled={!initialIsAdmin}
                         >
@@ -463,22 +471,38 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
                             {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
                         </select>
                     </div>
-                    {initialIsAdmin ? (
-                        <div>
-                            <label>Rate per Hour (LKR) *</label>
+                    {initialIsAdmin && (
+                        <div style={{ gridColumn: '1 / -1' }}>
+                            <label>Custom Description (Optional)</label>
                             <input
-                                type="number"
-                                value={manualRate}
-                                onChange={e => setManualRate(e.target.value)}
-                                placeholder={`Default: ${lecturerInfo?.hourly_rate || 3000}`}
+                                type="text"
+                                value={invoiceDescription}
+                                onChange={e => setInvoiceDescription(e.target.value)}
+                                placeholder={defaultDescription}
                                 style={{ width: '100%' }}
-                                className="bg-transparent border border-card-border rounded px-2 py-1 focus:border-primary transition-colors"
                             />
                         </div>
+                    )}
+                    {initialIsAdmin ? (
+                        !isFixedInvoice && (
+                            <div>
+                                <label>Rate per Hour (LKR) *</label>
+                                <input
+                                    type="number"
+                                    value={manualRate}
+                                    onChange={e => setManualRate(e.target.value)}
+                                    placeholder={`Default: ${lecturerInfo?.hourly_rate || 3000}`}
+                                    style={{ width: '100%' }}
+                                    className="bg-transparent border border-card-border rounded px-2 py-1 focus:border-primary transition-colors"
+                                />
+                            </div>
+                        )
                     ) : (
-                        <div>
-                            <p className="text-xs text-secondary font-semibold">Rate: {activeRate.toLocaleString()} / {currentUnit}</p>
-                        </div>
+                        !isFixedInvoice && !userRoles.includes('incubator_staff') && (
+                            <div>
+                                <p className="text-xs text-secondary font-semibold">Rate: {activeRate.toLocaleString()} / {currentUnit}</p>
+                            </div>
+                        )
                     )}
                     {isLecturerRole && isStaffRole && (
                         <div>
@@ -544,15 +568,15 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
 
                     {/* Details Row */}
                     <div className="flex justify-between mb-12">
-                        <div>
-                            <h3 className="font-bold text-lg">{lecturerInfo?.name}</h3>
-                            <p className="text-sm opacity-70">{lecturerInfo?.address || 'Address not set'}</p>
-                            <p className="text-sm opacity-70">Tel: {lecturerInfo?.phone || '-'}</p>
-                            <p className="text-sm opacity-70">Email: {lecturerInfo?.email}</p>
+                        <div className="flex flex-col gap-1 w-1/2">
+                            <h2 className="text-xl font-bold"><span className="opacity-80 font-normal">Name :</span> {lecturerInfo?.name || 'Your Name'}</h2>
+                            <p className="text-sm mt-1 whitespace-pre-wrap"><strong className="opacity-80 font-normal">Address :</strong> {lecturerInfo?.address || '-'}</p>
+                            <p className="text-sm mt-2"><strong className="opacity-80 font-normal">Tel :</strong> {lecturerInfo?.phone || '-'}</p>
+                            <p className="text-sm"><strong className="opacity-80 font-normal">Email :</strong> {lecturerInfo?.staff_email || lecturerInfo?.email}</p>
                         </div>
                         <div className="text-right">
-                            <p className="text-sm"><strong>Invoice No :</strong> {invoiceNo}</p>
-                            <p className="text-sm"><strong>Date :</strong> 15/${String(selectedMonth).padStart(2, '0')}/${selectedYear}</p>
+                            <p className="text-sm"><strong>Invoice No :</strong> {displayInvoiceNo}</p>
+                            <p className="text-sm"><strong>Date :</strong> 15/{String(selectedMonth).padStart(2, '0')}/{selectedYear}</p>
                         </div>
                     </div>
 
@@ -579,7 +603,7 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
                                 <tr>
                                     {!isFixedInvoice && <td style={{ padding: '8px' }}>{totalHours.toFixed(2)} {currentUnit === 'hour' ? 'Hrs' : 'Units'}</td>}
                                     <td style={{ padding: '8px' }}>
-                                        {isFixedInvoice ? `Professional service fees for the month of ${monthName} ${selectedYear}` : `Consultation and development services for the month of ${monthName} ${selectedYear}`}
+                                        {activeDescription}
                                     </td>
                                     {!isFixedInvoice && <td style={{ textAlign: 'right', padding: '8px' }}>{activeRate.toLocaleString()}</td>}
                                     <td style={{ textAlign: 'right', padding: '8px' }}>{grossTotal.toLocaleString()}</td>
@@ -588,32 +612,7 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
                         </table>
                     </div>
 
-                    {/* Timesheet Breakdown */}
-                    {!isFixedInvoice && filteredEntries.length > 0 && (
-                        <div className="border-b border-black pb-4 mb-8">
-                            <h4 className="font-bold mb-3 text-sm">Timesheet Approvals</h4>
-                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
-                                <thead style={{ background: '#f8fafc' }}>
-                                    <tr style={{ borderBottom: '1px solid #cbd5e1' }}>
-                                        <th style={{ padding: '6px', textAlign: 'left' }}>Date</th>
-                                        <th style={{ padding: '6px', textAlign: 'left' }}>In Time</th>
-                                        <th style={{ padding: '6px', textAlign: 'left' }}>Out Time</th>
-                                        <th style={{ padding: '6px', textAlign: 'right' }}>Hours</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {filteredEntries.map((entry, index) => (
-                                        <tr key={index} style={{ borderBottom: index < filteredEntries.length - 1 ? '1px solid #e2e8f0' : 'none' }}>
-                                            <td style={{ padding: '6px' }}>{new Date(entry.work_date).toLocaleDateString('en-GB')}</td>
-                                            <td style={{ padding: '6px' }}>{entry.in_time?.slice(0, 5)}</td>
-                                            <td style={{ padding: '6px' }}>{entry.out_time?.slice(0, 5)}</td>
-                                            <td style={{ padding: '6px', textAlign: 'right' }}>{Number(entry.hours).toFixed(2)}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
+
 
                     {/* Lower Section */}
                     <div className="flex justify-between gap-8">
@@ -656,18 +655,22 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
 
                     {/* Real Export Buttons */}
                     <div className="mt-8 pt-4 border-t border-gray-200 flex flex-col items-center gap-4 no-print" style={{ background: '#f8fafc', padding: '1.5rem', borderRadius: '1rem' }}>
-                        {existingInvoice?.status === 'approved' ? (
+                        <div className="flex flex-col items-center gap-4 justify-center w-full mb-6 z-10 relative">
                             <div className="flex gap-4 justify-center w-full">
-                                <button onClick={exportPDF} className="btn btn-primary" style={{ background: '#10b981', color: 'white', borderColor: '#059669' }}>
-                                    📄 Download Official PDF
+                                <button onClick={exportPDF} className={existingInvoice?.status === 'approved' ? "btn btn-primary" : "btn btn-secondary"} style={existingInvoice?.status === 'approved' ? { background: '#10b981', color: 'white', borderColor: '#059669' } : {}}>
+                                    📄 {existingInvoice?.status === 'approved' ? 'Download Official PDF' : 'Review Draft PDF'}
                                 </button>
-                                <button onClick={exportWord} className="btn btn-secondary bg-blue-50 text-blue-700 border-blue-200">
-                                    📝 Download Word Document
-                                </button>
+                                {existingInvoice?.status === 'approved' && (
+                                    <button onClick={exportWord} className="btn btn-secondary bg-blue-50 text-blue-700 border-blue-200">
+                                        📝 Download Word Document
+                                    </button>
+                                )}
                             </div>
-                        ) : (
+                        </div>
+
+                        {existingInvoice?.status !== 'approved' && (
                             <div className="flex flex-col items-center gap-4 justify-center w-full">
-                                {(!isSubmitted && !existingInvoice) ? (
+                                {(!isSubmitted && (!existingInvoice || existingInvoice.status !== 'pending')) ? (
                                     <button
                                         onClick={handleSubmitInvoice}
                                         disabled={submissionLoading}
@@ -677,14 +680,23 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
                                         {submissionLoading ? "Submitting..." : "📤 Submit for Approval"}
                                     </button>
                                 ) : (
-                                    <div className="flex items-center gap-2 text-amber-600 font-bold px-6 py-2 rounded-full border-2 border-amber-400 bg-amber-50 animate-fade-in">
-                                        <span>⏳ Pending Admin Approval</span>
-                                    </div>
+                                    <>
+                                        <div className="flex items-center gap-2 text-amber-600 font-bold px-6 py-2 rounded-full border-2 border-amber-400 bg-amber-50 animate-fade-in">
+                                            <span>⏳ Pending Admin Approval</span>
+                                        </div>
+                                        <button
+                                            onClick={handleSubmitInvoice}
+                                            disabled={submissionLoading}
+                                            className="btn btn-secondary border-dashed border-2 w-full max-w-xs animate-fade-in"
+                                        >
+                                            {submissionLoading ? "Updating..." : "🔄 Update Submission"}
+                                        </button>
+                                    </>
                                 )}
                                 <p className="text-xs text-secondary italic text-center mt-2">
                                     {(!isSubmitted && !existingInvoice) ?
                                         "You must submit this invoice to the Administrator for approval before generation." :
-                                        "The official invoice will be available to download once the Administrator approves it."}
+                                        "The official invoice will be available to download once the Administrator approves it. If you forgot to log hours, you can update your submission above!"}
                                 </p>
                             </div>
                         )}

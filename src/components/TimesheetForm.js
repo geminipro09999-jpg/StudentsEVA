@@ -19,9 +19,11 @@ export default function TimesheetForm({ entries, lecturerName }) {
         if (!inTime || !outTime) return null;
         const [ih, im] = inTime.split(':').map(Number);
         const [oh, om] = outTime.split(':').map(Number);
-        const diff = (oh * 60 + om) - (ih * 60 + im);
-        if (diff <= 0) return null;
-        return (diff / 60).toFixed(2);
+
+        let diff = (oh + om / 60) - (ih + im / 60);
+        if (diff <= 0) diff += 24; // Handle overnight or 0-duration
+
+        return (Math.round(diff * 100) / 100).toFixed(2);
     }, [inTime, outTime]);
 
     async function handleSubmit(e) {
