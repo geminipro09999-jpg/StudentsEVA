@@ -172,7 +172,8 @@ export default function AdminInvoicesPage() {
             doc.text([
                 `Account Name: ${staff.account_name || '-'}`,
                 `Bank Name: ${staff.bank_name || '-'}`,
-                `Account No: ${staff.account_no || '-'}`
+                `Account No: ${staff.account_no || '-'}`,
+                `Branch: ${staff.branch || '-'}`
             ], 20, finalY + 8);
 
             // Summary
