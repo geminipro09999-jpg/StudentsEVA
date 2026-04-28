@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import toast from "react-hot-toast";
 import { submitInvoice } from "@/app/actions/invoiceActions";
@@ -22,6 +22,7 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
     const [submissionLoading, setSubmissionLoading] = useState(false);
     const [isSubmitted, setIsSubmitted] = useState(false);
     const [invoiceType, setInvoiceType] = useState('timesheet');
+
 
     const lecturerMap = useMemo(() => {
         const m = {};
@@ -48,13 +49,25 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
         );
     }, [invoices, monthName, selectedYear, selectedLecturer, initialIsAdmin]);
 
-    // Prioritize snapshot values from the existing invoice if they exist
-    const activeRate = existingInvoice?.invoice_data?.hourlyRate || Number(manualRate) || lecturerInfo?.hourly_rate || 3000;
-    const currentUnit = existingInvoice?.invoice_data?.paymentUnit || lecturerInfo?.payment_unit || 'hour';
+    // Auto-set default type based on role when lecturer changes
+    useEffect(() => {
+        if (!existingInvoice && !isSubmitted) {
+            if (!isLecturerRole && isStaffRole) setInvoiceType('fixed');
+            else if (!isStaffRole && isLecturerRole) setInvoiceType('timesheet');
+        }
+    }, [selectedLecturer, isLecturerRole, isStaffRole, existingInvoice, isSubmitted]);
 
-    const activeInvoiceType = existingInvoice?.invoice_data?.invoiceType || ((!isLecturerRole && isStaffRole) ? 'fixed' : ((!isStaffRole && isLecturerRole) ? 'timesheet' : invoiceType));
+    // Prioritize snapshot values from the existing invoice if they exist
+    const activeInvoiceType = existingInvoice?.invoice_data?.invoiceType || invoiceType;
     const isFixedInvoice = activeInvoiceType === 'fixed';
-    const defaultDescription = `Consultation and development services for the month of ${periodLabel}`;
+
+    const activeRate = existingInvoice?.invoice_data?.hourlyRate ||
+        Number(manualRate) ||
+        (isFixedInvoice ? (lecturerInfo?.monthly_salary || 0) : (lecturerInfo?.hourly_rate || 3000));
+
+    const currentUnit = existingInvoice?.invoice_data?.paymentUnit || (isFixedInvoice ? 'month' : (lecturerInfo?.payment_unit || 'hour'));
+
+    const defaultDescription = `consultation and development services for the month of ${periodLabel}`;
     const activeDescription = existingInvoice?.invoice_data?.description || invoiceDescription || defaultDescription;
 
     const rawFilteredEntries = useMemo(() => {
@@ -74,7 +87,7 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
     const filteredEntries = existingInvoice?.invoice_data?.items || rawFilteredEntries;
     const totalHours = filteredEntries.reduce((s, e) => s + Number(e.hours), 0);
 
-    const calculatedGross = totalHours * activeRate;
+    const calculatedGross = isFixedInvoice ? activeRate : (totalHours * activeRate);
 
     const availableYears = useMemo(() => {
         const years = [...new Set((entries || []).map(e => e.work_date ? Number(e.work_date.split('-')[0]) : null).filter(Boolean))].sort((a, b) => b - a);
@@ -100,13 +113,14 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
         setSubmissionLoading(true);
 
         // Use fresh raw data in case the user added timesheets after initially submitting
+        const freshInvoiceType = invoiceType;
+        const freshIsFixed = freshInvoiceType === 'fixed';
         const freshTotalHours = rawFilteredEntries.reduce((s, e) => s + Number(e.hours), 0);
-        const freshRate = Number(manualRate) || lecturerInfo?.hourly_rate || 3000;
-        const freshGross = freshTotalHours * freshRate;
+        const freshRate = Number(manualRate) || (freshIsFixed ? (lecturerInfo?.monthly_salary || 0) : (lecturerInfo?.hourly_rate || 3000));
+        const freshGross = freshIsFixed ? freshRate : (freshTotalHours * freshRate);
         const freshDeduction = existingInvoice ? Number(existingInvoice.deductions || 0) : 0;
         const freshFinalTotal = freshGross - freshDeduction;
-        const freshPaymentUnit = lecturerInfo?.payment_unit || 'hour';
-        const freshInvoiceType = (!isLecturerRole && isStaffRole) ? 'fixed' : ((!isStaffRole && isLecturerRole) ? 'timesheet' : invoiceType);
+        const freshPaymentUnit = freshIsFixed ? 'month' : (lecturerInfo?.payment_unit || 'hour');
 
         const res = await submitInvoice({
             lecturer_id: selectedLecturer,
@@ -197,16 +211,19 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
                 'unicomtic@gmail.com'
             ], 20, 102);
 
-            let headSummary = [];
-            let bodySummary = [];
+            const headSummary = isFixedInvoice
+                ? [['Description', 'Total - LKR']]
+                : [['Quantity', 'Description', 'Unit Price', 'Total - LKR']];
 
-            headSummary = [['Quantity', 'Description', 'Unit Price', 'Total - LKR']];
-            bodySummary = [[
-                isFixedInvoice ? '1.00 Unit' : `${totalHours.toFixed(2)} ${currentUnit === 'hour' ? 'Hrs' : 'Units'}`,
-                activeDescription,
-                activeRate.toLocaleString(),
-                grossTotal.toLocaleString()
-            ]];
+            const bodySummary = [isFixedInvoice
+                ? [activeDescription, grossTotal.toLocaleString()]
+                : [
+                    `${totalHours.toFixed(2)} ${currentUnit === 'hour' ? 'Hrs' : 'Units'}`,
+                    activeDescription,
+                    activeRate.toLocaleString(),
+                    grossTotal.toLocaleString()
+                ]
+            ];
 
             autoTable(doc, {
                 startY: 125,
@@ -215,7 +232,9 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
                 theme: 'grid',
                 headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: 'bold', lineWidth: 0.5, lineColor: [0, 0, 0] },
                 bodyStyles: { textColor: [0, 0, 0], lineWidth: 0.1, lineColor: [200, 200, 200] },
-                columnStyles: { 0: { cellWidth: 25 }, 1: { cellWidth: 'auto' }, 2: { cellWidth: 35, halign: 'right' }, 3: { cellWidth: 35, halign: 'right' } }
+                columnStyles: isFixedInvoice
+                    ? { 0: { cellWidth: 'auto' }, 1: { cellWidth: 40, halign: 'right' } }
+                    : { 0: { cellWidth: 25 }, 1: { cellWidth: 'auto' }, 2: { cellWidth: 35, halign: 'right' }, 3: { cellWidth: 35, halign: 'right' } }
             });
 
             const finalY = doc.lastAutoTable.finalY + 15;
@@ -475,34 +494,26 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
                             />
                         </div>
                     )}
-                    {initialIsAdmin ? (
-                        !isFixedInvoice && (
-                            <div>
-                                <label>Rate per Hour (LKR) *</label>
-                                <input
-                                    type="number"
-                                    value={manualRate}
-                                    onChange={e => setManualRate(e.target.value)}
-                                    placeholder={`Default: ${lecturerInfo?.hourly_rate || 3000}`}
-                                    style={{ width: '100%' }}
-                                    className="bg-transparent border border-card-border rounded px-2 py-1 focus:border-primary transition-colors"
-                                />
-                            </div>
-                        )
-                    ) : (
-                        !isFixedInvoice && !userRoles.includes('incubator_staff') && (
-                            <div>
-                                <p className="text-xs text-secondary font-semibold">Rate: {activeRate.toLocaleString()} / {currentUnit}</p>
-                            </div>
-                        )
-                    )}
-                    {isLecturerRole && isStaffRole && (
+                    {(isLecturerRole || isStaffRole) && (
                         <div>
                             <label>Invoice Type</label>
                             <select value={invoiceType} onChange={e => setInvoiceType(e.target.value)} style={{ width: '100%' }}>
                                 <option value="timesheet">Timesheet (Hourly/Unit)</option>
                                 <option value="fixed">Fixed Monthly Salary</option>
                             </select>
+                        </div>
+                    )}
+                    {initialIsAdmin && !isFixedInvoice && (
+                        <div>
+                            <label>Rate per Hour (LKR) *</label>
+                            <input
+                                type="number"
+                                value={manualRate}
+                                onChange={e => setManualRate(e.target.value)}
+                                placeholder={`Default: ${lecturerInfo?.hourly_rate || 3000}`}
+                                style={{ width: '100%' }}
+                                className="bg-transparent border border-card-border rounded px-2 py-1 focus:border-primary transition-colors"
+                            />
                         </div>
                     )}
                 </div>

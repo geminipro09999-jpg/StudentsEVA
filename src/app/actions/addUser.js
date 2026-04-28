@@ -33,7 +33,8 @@ export async function addUser(formData) {
             role: roles[0],
             roles: roles,
             hourly_rate: formData.get("hourly_rate") ? Number(formData.get("hourly_rate")) : 3000,
-            payment_unit: formData.get("payment_unit") || 'hour'
+            payment_unit: formData.get("payment_unit") || 'hour',
+            monthly_salary: formData.get("monthly_salary") ? Number(formData.get("monthly_salary")) : 0
         };
 
         const { error } = await supabase.from('users').insert(insertData);

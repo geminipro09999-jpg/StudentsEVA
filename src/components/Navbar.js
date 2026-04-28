@@ -44,9 +44,11 @@ export default function Navbar() {
                             <Link href="/timesheet/admin/invoices" className={`nav-link ${pathname === '/timesheet/admin/invoices' ? 'active' : ''}`}>Review Invoices</Link>
                         </>
                     )}
-                    {(roles.includes('lecturer') || session.user.role === 'lecturer') && !roles.includes('incubator_staff') && (
+                    {(roles.includes('lecturer') || session.user.role === 'lecturer') && (
                         <>
-                            <Link href="/feedback/add" className={`nav-link ${pathname === '/feedback/add' ? 'active' : ''}`}>Add Feedback</Link>
+                            {!isPureStaff && (
+                                <Link href="/feedback/add" className={`nav-link ${pathname === '/feedback/add' ? 'active' : ''}`}>Add Feedback</Link>
+                            )}
                             <Link href="/timesheet" className={`nav-link ${pathname === '/timesheet' ? 'active' : ''}`}>Timesheet</Link>
                         </>
                     )}
@@ -147,14 +149,22 @@ export default function Navbar() {
                             </>
                         ) : (
                             <>
-                                <Link href="/feedback/add" className={`bottom-nav-item ${pathname === '/feedback/add' ? 'active' : ''}`}>
-                                    <span className="icon">📝</span>
-                                    <span>Feedback</span>
-                                </Link>
-                                {!roles.includes('incubator_staff') && (
+                                {(roles.includes('lecturer') || session.user.role === 'lecturer') && (
+                                    <Link href="/feedback/add" className={`bottom-nav-item ${pathname === '/feedback/add' ? 'active' : ''}`}>
+                                        <span className="icon">📝</span>
+                                        <span>Feedback</span>
+                                    </Link>
+                                )}
+                                {(roles.includes('lecturer') || session.user.role === 'lecturer') && (
                                     <Link href="/timesheet" className={`bottom-nav-item ${pathname === '/timesheet' ? 'active' : ''}`}>
                                         <span className="icon">⏱️</span>
                                         <span>Times</span>
+                                    </Link>
+                                )}
+                                {roles.includes('incubator_staff') && (
+                                    <Link href="/timesheet/invoice" className={`bottom-nav-item ${pathname.includes('invoice') ? 'active' : ''}`}>
+                                        <span className="icon">🧾</span>
+                                        <span>Invoice</span>
                                     </Link>
                                 )}
                                 <Link href="/profile" className={`bottom-nav-item ${pathname === '/profile' ? 'active' : ''}`}>

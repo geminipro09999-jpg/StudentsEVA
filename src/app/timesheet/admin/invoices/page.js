@@ -137,16 +137,21 @@ export default function AdminInvoicesPage() {
                 'unicomtic@gmail.com'
             ], 140, 50);
 
+            const isFixed = inv.invoice_data?.invoiceType === 'fixed';
+
             // Table
             autoTable(doc, {
                 startY: 85,
-                head: [['Quantity', 'Description', 'Unit Price', 'Total - LKR']],
-                body: [[
-                    inv.invoiceType === 'fixed' ? '1.00 Unit' : `${(inv.invoice_data?.totalHours || 0).toFixed(2)} Hrs`,
-                    inv.invoice_data?.description || `Consultation and development services for the month of ${inv.month} ${inv.year}`,
-                    (inv.invoice_data?.hourlyRate || 0).toLocaleString(),
-                    currentBase.toLocaleString()
-                ]],
+                head: isFixed ? [['Description', 'Total - LKR']] : [['Quantity', 'Description', 'Unit Price', 'Total - LKR']],
+                body: [isFixed
+                    ? [inv.invoice_data?.description || `consultation and development services for the month of ${inv.month} ${inv.year}`, currentBase.toLocaleString()]
+                    : [
+                        `${(inv.invoice_data?.totalHours || 0).toFixed(2)} Hrs`,
+                        inv.invoice_data?.description || `consultation and development services for the month of ${inv.month} ${inv.year}`,
+                        (inv.invoice_data?.hourlyRate || 0).toLocaleString(),
+                        currentBase.toLocaleString()
+                    ]
+                ],
                 theme: 'grid',
                 headStyles: {
                     fillColor: [255, 255, 255],
@@ -160,7 +165,9 @@ export default function AdminInvoicesPage() {
                     lineWidth: 0.1,
                     lineColor: [200, 200, 200]
                 },
-                columnStyles: { 0: { cellWidth: 25 }, 1: { cellWidth: 'auto' }, 2: { cellWidth: 35, halign: 'right' }, 3: { cellWidth: 35, halign: 'right' } }
+                columnStyles: isFixed
+                    ? { 0: { cellWidth: 'auto' }, 1: { cellWidth: 40, halign: 'right' } }
+                    : { 0: { cellWidth: 25 }, 1: { cellWidth: 'auto' }, 2: { cellWidth: 35, halign: 'right' }, 3: { cellWidth: 35, halign: 'right' } }
             });
 
             const finalY = doc.lastAutoTable.finalY + 15;
@@ -261,8 +268,9 @@ export default function AdminInvoicesPage() {
 
     const handleRateChange = (val) => {
         const newRate = Number(val);
-        const totalHours = selectedInvoice.invoice_data?.totalHours || 0;
-        const newGross = totalHours * newRate;
+        const isFixed = selectedInvoice.invoice_data?.invoiceType === 'fixed';
+        const totalHours = isFixed ? 0 : (selectedInvoice.invoice_data?.totalHours || 0);
+        const newGross = isFixed ? newRate : (totalHours * newRate);
         setSelectedInvoice(prev => ({
             ...prev,
             invoice_data: { ...prev.invoice_data, hourlyRate: newRate, calculatedGross: newGross }
@@ -273,14 +281,15 @@ export default function AdminInvoicesPage() {
     const handleSaveCorrections = async () => {
         setIsSavingCorrections(true);
         try {
-            const totalHours = editingItems.reduce((sum, item) => sum + Number(item.hours || 0), 0);
+            const isFixed = selectedInvoice.invoice_data?.invoiceType === 'fixed';
+            const totalHours = isFixed ? 0 : editingItems.reduce((sum, item) => sum + Number(item.hours || 0), 0);
             const hourlyRate = selectedInvoice.invoice_data?.hourlyRate || 3000;
-            const calculatedGross = totalHours * hourlyRate;
+            const calculatedGross = isFixed ? hourlyRate : (totalHours * hourlyRate);
 
             const updatedData = {
                 ...selectedInvoice.invoice_data,
-                items: editingItems,
-                totalHours,
+                items: isFixed ? [] : editingItems,
+                totalHours: isFixed ? 0 : totalHours,
                 calculatedGross
             };
 
@@ -310,8 +319,7 @@ export default function AdminInvoicesPage() {
     };
 
     if (loading) return <div className="container mt-8 text-center">Loading invoices...</div>;
-
-    const isFixedModal = selectedInvoice && (selectedInvoice.invoice_data?.totalHours === 0 || !selectedInvoice.invoice_data?.totalHours) && (!selectedInvoice.invoice_data?.items || selectedInvoice.invoice_data.items.length === 0);
+    const isFixedModal = selectedInvoice && selectedInvoice.invoice_data?.invoiceType === 'fixed';
 
     return (
         <div className="container mt-8 animate-fade-in">
@@ -378,6 +386,11 @@ export default function AdminInvoicesPage() {
                                             <span className={`badge ${inv.status === 'approved' ? 'badge-success' : inv.status === 'rejected' ? 'badge-danger' : 'badge-warning'}`}>
                                                 {inv.status.toUpperCase()}
                                             </span>
+                                            {inv.invoice_data?.invoiceType === 'fixed' && (
+                                                <span className="badge badge-secondary ml-2" style={{ background: 'rgba(99, 102, 241, 0.1)', color: 'var(--accent-color)' }}>
+                                                    FIXED
+                                                </span>
+                                            )}
 
                                             {/* Quick Timesheet Preview (NEW) */}
                                             {inv.invoice_data?.items && inv.invoice_data.items.length > 0 && (
@@ -480,37 +493,39 @@ export default function AdminInvoicesPage() {
                         </div>
 
                         <div className={`grid ${isFixedModal ? 'grid-cols-1 max-w-sm mx-auto' : 'grid-cols-2'} gap-8 mb-8`}>
-                            {!isFixedModal && (
-                                <div className="glass-card p-4">
-                                    <h4 className="text-xs font-bold uppercase tracking-wider text-secondary mb-3">Calculated Stats</h4>
-                                    <div className="flex flex-col gap-2">
+                            <div className="glass-card p-4">
+                                <h4 className="text-xs font-bold uppercase tracking-wider text-secondary mb-3">
+                                    {isFixedModal ? 'Salary Details' : 'Calculated Stats'}
+                                </h4>
+                                <div className="flex flex-col gap-2">
+                                    {!isFixedModal && (
                                         <div className="flex justify-between">
                                             <span className="text-sm">Total Approved Hours:</span>
                                             <span className="font-bold">{selectedInvoice.invoice_data?.totalHours?.toFixed(2) || '0.00'}</span>
                                         </div>
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-sm">Hourly Rate:</span>
-                                            <div className="flex items-center gap-1">
-                                                {selectedInvoice.status === 'pending' ? (
-                                                    <input
-                                                        type="number"
-                                                        value={selectedInvoice.invoice_data?.hourlyRate || ''}
-                                                        onChange={e => handleRateChange(e.target.value)}
-                                                        className="bg-transparent border border-card-border rounded px-2 py-0.5 text-sm w-20 focus:border-primary text-right font-bold w-full"
-                                                    />
-                                                ) : (
-                                                    <span className="font-bold">{selectedInvoice.invoice_data?.hourlyRate?.toLocaleString() || '3000'}</span>
-                                                )}
-                                                <span className="text-secondary text-xs">/ {selectedInvoice.invoice_data?.paymentUnit || 'hour'}</span>
-                                            </div>
-                                        </div>
-                                        <div className="flex justify-between pt-2 border-t border-card-border mt-2">
-                                            <span className="text-sm">Calculated Base:</span>
-                                            <span className="font-bold text-accent">LKR {(selectedInvoice.invoice_data?.totalHours * (selectedInvoice.invoice_data?.hourlyRate || 3000))?.toLocaleString() || '0'}</span>
+                                    )}
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-sm">{isFixedModal ? 'Monthly Salary:' : 'Hourly Rate:'}</span>
+                                        <div className="flex items-center gap-1">
+                                            {selectedInvoice.status === 'pending' ? (
+                                                <input
+                                                    type="number"
+                                                    value={selectedInvoice.invoice_data?.hourlyRate || ''}
+                                                    onChange={e => handleRateChange(e.target.value)}
+                                                    className="bg-transparent border border-card-border rounded px-2 py-0.5 text-sm w-24 focus:border-primary text-right font-bold"
+                                                />
+                                            ) : (
+                                                <span className="font-bold">{selectedInvoice.invoice_data?.hourlyRate?.toLocaleString() || '0'}</span>
+                                            )}
+                                            <span className="text-secondary text-xs">/ {isFixedModal ? 'month' : (selectedInvoice.invoice_data?.paymentUnit || 'hour')}</span>
                                         </div>
                                     </div>
+                                    <div className="flex justify-between pt-2 border-t border-card-border mt-2">
+                                        <span className="text-sm">{isFixedModal ? 'Gross Total:' : 'Calculated Base:'}</span>
+                                        <span className="font-bold text-accent">LKR {isFixedModal ? (selectedInvoice.invoice_data?.hourlyRate || 0).toLocaleString() : (selectedInvoice.invoice_data?.totalHours * (selectedInvoice.invoice_data?.hourlyRate || 3000))?.toLocaleString() || '0'}</span>
+                                    </div>
                                 </div>
-                            )}
+                            </div>
                             <div className="glass-card p-4 border-accent/20 bg-accent/5">
                                 <h4 className="text-xs font-bold uppercase tracking-wider text-secondary mb-3">Authorized Payment</h4>
                                 <div className="flex flex-col gap-2">

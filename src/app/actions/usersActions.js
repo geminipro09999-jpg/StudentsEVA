@@ -16,7 +16,7 @@ export async function getUsers() {
 
         const { data, error } = await supabase
             .from('users')
-            .select('id, name, email, role, roles, created_at, hourly_rate, payment_unit')
+            .select('id, name, email, role, roles, created_at, hourly_rate, payment_unit, monthly_salary')
             .order('name');
 
         if (error) {
@@ -81,7 +81,8 @@ export async function updateUserRoles(userId, roles, paymentInfo = {}) {
             roles: roles,
             role: roles[0],
             hourly_rate: paymentInfo.hourly_rate,
-            payment_unit: paymentInfo.payment_unit
+            payment_unit: paymentInfo.payment_unit,
+            monthly_salary: paymentInfo.monthly_salary
         };
 
         const { error } = await supabase
