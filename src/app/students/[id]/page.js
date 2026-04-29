@@ -45,6 +45,13 @@ export default async function StudentProfilePage({ params }) {
         .order('year', { ascending: false })
         .order('month', { ascending: false });
 
+    // Fetch quiz records for this student
+    const { data: quizzes } = await supabase
+        .from('quiz_marks')
+        .select('*')
+        .eq('student_id', id)
+        .order('created_at', { ascending: false });
+
     const usersMap = (allUsers || []).reduce((acc, u) => { acc[u.id] = u; return acc; }, {});
     const subjectsMap = (allSubjects || []).reduce((acc, s) => { acc[s.id] = s; return acc; }, {});
     const labsMap = (allLabs || []).reduce((acc, l) => {
@@ -156,6 +163,35 @@ export default async function StudentProfilePage({ params }) {
                 </div>
 
                 <div className="profile-main">
+                    {/* Quiz Performance History */}
+                    <div className="glass-card mb-4">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 style={{ fontSize: '1.5rem' }}>📝 Quiz Performance</h3>
+                            <span className="badge" style={{ background: 'rgba(66, 133, 244, 0.1)', color: '#4285f4' }}>{(quizzes || []).length} Quizzes</span>
+                        </div>
+
+                        {(!quizzes || quizzes.length === 0) ? (
+                            <p style={{ color: 'var(--text-secondary)' }}>No quiz marks recorded for this student yet.</p>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {quizzes.map((q) => (
+                                    <div key={q.id} className="p-4 rounded-xl bg-surface-container-low border border-card-border flex justify-between items-center">
+                                        <div>
+                                            <h6 className="text-sm font-bold m-0">{q.quiz_name}</h6>
+                                            <p className="text-[10px] text-tertiary m-0">{new Date(q.created_at).toLocaleDateString()}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-sm font-black text-accent-color m-0">{q.marks} / {q.total_marks}</p>
+                                            <span className={`text-[10px] font-bold ${((q.marks/q.total_marks)*100) >= 50 ? 'text-success' : 'text-danger'}`}>
+                                                {((q.marks / q.total_marks) * 100).toFixed(0)}%
+                                            </span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
                     {/* Attendance History */}
                     <div className="glass-card mb-4">
                         <div className="flex justify-between items-center mb-4">

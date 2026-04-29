@@ -11,11 +11,25 @@ export default async function ReportsPage() {
         redirect("/dashboard");
     }
 
-    const { data: feedbacks, error } = await supabase
+    // 1. Fetch Feedback Data
+    const { data: feedbacks } = await supabase
         .from('feedbacks')
         .select('*, students(name, student_id, group_name)')
         .order('created_at', { ascending: false });
 
+    // 2. Fetch Viva Events
+    const { data: vivas } = await supabase
+        .from('viva_events')
+        .select('*')
+        .order('viva_date', { ascending: false });
+
+    // 3. Fetch Quiz Marks
+    const { data: quizzes } = await supabase
+        .from('quiz_marks')
+        .select('*, students(name, student_id, group_name)')
+        .order('created_at', { ascending: false });
+
+    // 4. Auxiliary Data for Mapping
     let allLabs = [];
     let allUsers = [];
     let allSubjects = [];
@@ -32,13 +46,9 @@ export default async function ReportsPage() {
     const labsMap = allLabs.reduce((acc, l) => { acc[l.id] = l; return acc; }, {});
     const usersMap = allUsers.reduce((acc, u) => { acc[u.id] = u; return acc; }, {});
 
-    if (error) {
-        console.error("Error fetching report data", error);
-    }
-
     const ratingLabels = { 5: "Excellent", 4: "Very Good", 3: "Good", 2: "Average", 1: "Bad" };
 
-    const reportData = (feedbacks || []).map(f => ({
+    const formattedFeedbacks = (feedbacks || []).map(f => ({
         id: f.id,
         date: new Date(f.created_at).toLocaleDateString(),
         ut_number: f.students?.student_id || 'N/A',
@@ -55,10 +65,16 @@ export default async function ReportsPage() {
     return (
         <div className="container animate-fade-in mt-4">
             <div className="page-hero">
-                <h2>📊 Feedback Reports</h2>
-                <p>Analyze and export student feedback data</p>
+                <h2>📊 Centralized Reports</h2>
+                <p>Analyze and export Feedbacks, Vivas, and Quiz data</p>
             </div>
-            <ReportDirectory feedbacks={reportData} allSubjects={allSubjects} allLabs={allLabs} />
+            <ReportDirectory 
+                feedbacks={formattedFeedbacks} 
+                vivas={vivas || []}
+                quizzes={quizzes || []}
+                allSubjects={allSubjects} 
+                allLabs={allLabs} 
+            />
         </div>
     );
 }

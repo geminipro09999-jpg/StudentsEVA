@@ -42,6 +42,8 @@ export default function Navbar() {
                             <Link href="/users" className={`nav-link ${pathname === '/users' ? 'active' : ''}`}>Users</Link>
                             <Link href="/reports" className={`nav-link ${pathname === '/reports' ? 'active' : ''}`}>Reports</Link>
                             <Link href="/timesheet/admin/invoices" className={`nav-link ${pathname === '/timesheet/admin/invoices' ? 'active' : ''}`}>Review Invoices</Link>
+                            <Link href="/vivas" className={`nav-link ${pathname.includes('/vivas') ? 'active' : ''}`}>Vivas</Link>
+                            <Link href="/quiz-import" className={`nav-link ${pathname === '/quiz-import' ? 'active' : ''}`}>Quiz Import</Link>
                         </>
                     )}
                     {(roles.includes('lecturer') || session.user.role === 'lecturer') && (
@@ -50,6 +52,7 @@ export default function Navbar() {
                                 <Link href="/feedback/add" className={`nav-link ${pathname === '/feedback/add' ? 'active' : ''}`}>Add Feedback</Link>
                             )}
                             <Link href="/timesheet" className={`nav-link ${pathname === '/timesheet' ? 'active' : ''}`}>Timesheet</Link>
+                            <Link href="/vivas" className={`nav-link ${pathname.includes('/vivas') || pathname.includes('/viva-scoring') ? 'active' : ''}`}>Vivas</Link>
                         </>
                     )}
                     {roles.includes('incubator_staff') && (
@@ -142,6 +145,10 @@ export default function Navbar() {
                                     <span className="icon">🧾</span>
                                     <span>Review</span>
                                 </Link>
+                                <Link href="/vivas" className={`bottom-nav-item ${pathname.includes('/vivas') ? 'active' : ''}`}>
+                                    <span className="icon">🎤</span>
+                                    <span>Vivas</span>
+                                </Link>
                                 <Link href="/profile" className={`bottom-nav-item ${pathname === '/profile' ? 'active' : ''}`}>
                                     <span className="icon">👤</span>
                                     <span>Profile</span>
@@ -159,6 +166,12 @@ export default function Navbar() {
                                     <Link href="/timesheet" className={`bottom-nav-item ${pathname === '/timesheet' ? 'active' : ''}`}>
                                         <span className="icon">⏱️</span>
                                         <span>Times</span>
+                                    </Link>
+                                )}
+                                {(roles.includes('lecturer') || session.user.role === 'lecturer') && (
+                                    <Link href="/vivas" className={`bottom-nav-item ${pathname.includes('/vivas') || pathname.includes('/viva-scoring') ? 'active' : ''}`}>
+                                        <span className="icon">🎤</span>
+                                        <span>Vivas</span>
                                     </Link>
                                 )}
                                 {roles.includes('incubator_staff') && (
