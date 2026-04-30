@@ -37,7 +37,7 @@ export default async function VivaScoringPage({ params }) {
                 </div>
             </div>
 
-            <VivaScoringClient viva={viva} />
+            <VivaScoringClient viva={viva} isAdmin={isAdmin} />
         </div>
     );
 }

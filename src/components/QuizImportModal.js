@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { importQuizMarks } from "@/app/actions/quizActions";
+import { getVivas, getVivaDetails } from "@/app/actions/vivaActions";
+import { bulkImportVivaScores } from "@/app/actions/scoringActions";
 import { supabase } from "@/lib/supabase";
 import toast from "react-hot-toast";
 import * as XLSX from "xlsx";
@@ -15,18 +17,52 @@ export default function QuizImportModal() {
     const [loading, setLoading] = useState(false);
     const [previewData, setPreviewData] = useState(null);
     const [studentMap, setStudentMap] = useState(new Map());
+    
+    // Viva Integration State
+    const [vivas, setVivas] = useState([]);
+    const [selectedVivaId, setSelectedVivaId] = useState("");
+    const [vivaCriteria, setVivaCriteria] = useState([]);
+    const [selectedCriteriaId, setSelectedCriteriaId] = useState("");
 
-    // Fetch student map for client-side preview
+    // Fetch initial data
     useEffect(() => {
-        const fetchStudents = async () => {
-            const { data } = await supabase.from('students').select('id, student_id, name');
-            if (data) {
-                const map = new Map(data.map(s => [s.student_id, s]));
+        const fetchData = async () => {
+            const { data: students } = await supabase.from('students').select('id, student_id, name');
+            if (students) {
+                const map = new Map(students.map(s => [s.student_id, s]));
                 setStudentMap(map);
             }
+            
+            const { data: vivaList } = await getVivas();
+            if (vivaList) setVivas(vivaList);
         };
-        if (isOpen) fetchStudents();
+        if (isOpen) fetchData();
     }, [isOpen]);
+
+    // Fetch criteria when viva is selected
+    useEffect(() => {
+        const fetchCriteria = async () => {
+            if (!selectedVivaId) {
+                setVivaCriteria([]);
+                setSelectedCriteriaId("");
+                return;
+            }
+            const { data } = await getVivaDetails(selectedVivaId);
+            if (data?.criteria) {
+                setVivaCriteria(data.criteria);
+                // Try to auto-select "Quiz" criteria if it exists
+                const quizCrit = data.criteria.find(c => c.name.toLowerCase().includes('quiz'));
+                if (quizCrit) {
+                    setSelectedCriteriaId(quizCrit.id);
+                    setTotalMarks(quizCrit.max_marks);
+                } else if (data.criteria.length > 0) {
+                    setSelectedCriteriaId(data.criteria[0].id);
+                    setTotalMarks(data.criteria[0].max_marks);
+                }
+            }
+        };
+        fetchCriteria();
+    }, [selectedVivaId]);
 
     const handleFileChange = (e) => {
         const selectedFile = e.target.files[0];
@@ -90,83 +126,130 @@ export default function QuizImportModal() {
 
     const handleConfirm = async () => {
         if (!previewData || !quizName) return;
-        const validOnly = previewData.filter(p => p.isValid).map(p => ({
-            student_id: utToInternal(p.utNumber), // Helper
-            marks: p.marks
-        }));
-
-        if (validOnly.length === 0) return toast.error("No valid data to import");
-
+        
         setLoading(true);
-        // Map to final format for action
-        const finalData = previewData.filter(p => p.isValid).map(p => ({
-            student_id: p.utNumber, // The action handles lookup, but we already matched it
-            marks: p.marks
-        }));
+        try {
+            // Prepare data for import
+            const finalData = previewData.filter(p => p.isValid).map(p => ({
+                utNumber: p.utNumber,
+                score: p.marks
+            }));
 
-        const res = await importQuizMarks(finalData, quizName, totalMarks);
-        if (res.success) {
-            toast.success(`Successfully imported ${res.importedCount} records!`);
-            setIsOpen(false);
-            window.location.reload();
-        } else {
-            toast.error(res.error || "Failed to import");
+            if (finalData.length === 0) throw new Error("No valid data to import");
+
+            let res;
+            if (selectedVivaId && selectedCriteriaId) {
+                // Import directly into Viva scores
+                res = await bulkImportVivaScores(selectedVivaId, selectedCriteriaId, finalData);
+            } else {
+                // Import into generic Quiz Marks table
+                res = await importQuizMarks(finalData, quizName, totalMarks);
+            }
+
+            if (res.success) {
+                toast.success(`Successfully imported ${res.importedCount || res.count} records!`);
+                setIsOpen(false);
+                window.location.reload();
+            } else {
+                throw new Error(res.error || "Failed to import");
+            }
+        } catch (err) {
+            toast.error(err.message);
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
-
-    const utToInternal = (ut) => studentMap.get(ut)?.id;
 
     return (
         <>
-            <button onClick={() => setIsOpen(true)} className="btn btn-secondary flex items-center gap-2">
-                <span>📥</span> Import Quiz CSV
+            <button onClick={() => setIsOpen(true)} className="btn btn-secondary flex items-center gap-2 shadow-sm hover:translate-y-[-2px] transition-all">
+                <span>📊</span> Import Quiz Marks
             </button>
 
             {isOpen && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-surface-container p-8 rounded-3xl w-full max-w-2xl shadow-2xl animate-fade-in-scale max-h-[90vh] flex flex-col">
-                        <div className="flex justify-between items-center mb-6">
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+                    <div className="bg-surface-container p-8 rounded-3xl w-full max-w-2xl shadow-2xl animate-fade-in-scale max-h-[90vh] flex flex-col border border-card-border">
+                        <div className="flex justify-between items-center mb-8">
                             <div>
-                                <h3 className="text-2xl font-bold m-0">Import Quiz Marks</h3>
-                                <p className="text-secondary text-sm">Upload CSV and verify data before importing</p>
+                                <h3 className="text-2xl font-bold m-0 bg-primary-gradient bg-clip-text text-transparent">Import Quiz & Viva Scores</h3>
+                                <p className="text-secondary text-sm mt-1">Select a Viva session to link these marks to a report</p>
                             </div>
-                            <button onClick={() => setIsOpen(false)} className="text-secondary hover:text-primary">✕</button>
+                            <button onClick={() => setIsOpen(false)} className="w-10 h-10 rounded-full bg-surface-container-high flex items-center justify-center text-secondary hover:bg-danger/10 hover:text-danger transition-all">✕</button>
                         </div>
 
                         <div className="space-y-6 flex-1 overflow-y-auto pr-2 custom-scrollbar">
+                            {/* NEW: Viva Selection Section */}
+                            <div className="p-5 rounded-2xl bg-accent-glow/30 border border-accent-color/20 space-y-4">
+                                <div className="flex items-center gap-2 text-accent-color mb-2">
+                                    <span className="text-lg">🔗</span>
+                                    <h4 className="text-xs font-bold uppercase tracking-widest m-0">Link to Viva Session</h4>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] uppercase font-bold text-tertiary">Select Viva Event</label>
+                                        <select 
+                                            value={selectedVivaId} 
+                                            onChange={(e) => setSelectedVivaId(e.target.value)}
+                                            className="w-full bg-surface-container-high border-none"
+                                        >
+                                            <option value="">None (Generic Quiz Marks Only)</option>
+                                            {vivas.map(v => (
+                                                <option key={v.id} value={v.id}>{v.name} ({new Date(v.viva_date).toLocaleDateString()})</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    {selectedVivaId && (
+                                        <div className="space-y-1 animate-fade-in">
+                                            <label className="text-[10px] uppercase font-bold text-tertiary">Select Target Metric</label>
+                                            <select 
+                                                value={selectedCriteriaId} 
+                                                onChange={(e) => setSelectedCriteriaId(e.target.value)}
+                                                className="w-full bg-surface-container-high border-none"
+                                                required={!!selectedVivaId}
+                                            >
+                                                <option value="" disabled>Choose metric...</option>
+                                                {vivaCriteria.map(c => (
+                                                    <option key={c.id} value={c.id}>{c.name} (Max {c.max_marks})</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    )}
+                                </div>
+                                {selectedVivaId && (
+                                    <p className="text-[10px] text-accent-color m-0 font-medium">✨ These marks will automatically appear in the Viva Report under the selected metric.</p>
+                                )}
+                            </div>
+
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-secondary uppercase tracking-widest">Quiz Name</label>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] uppercase font-bold text-tertiary">Import Reference Name</label>
                                     <input 
                                         type="text" 
-                                        placeholder="e.g., Python Basics"
+                                        placeholder="e.g., Week 1 Quiz"
                                         value={quizName}
                                         onChange={(e) => setQuizName(e.target.value)}
-                                        className="w-full"
                                         required
                                     />
                                 </div>
 
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-secondary uppercase tracking-widest">Total Questions</label>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] uppercase font-bold text-tertiary">Total Questions in File</label>
                                     <input 
                                         type="number" 
                                         value={totalQuestions}
                                         onChange={(e) => setTotalQuestions(e.target.value)}
-                                        className="w-full"
                                         required
                                     />
                                 </div>
 
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-secondary uppercase tracking-widest">Max Marks (Weight)</label>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] uppercase font-bold text-tertiary">Target Weight (Marks)</label>
                                     <input 
                                         type="number" 
                                         value={totalMarks}
                                         onChange={(e) => setTotalMarks(e.target.value)}
-                                        className="w-full"
                                         required
+                                        disabled={!!selectedCriteriaId}
                                     />
                                 </div>
                             </div>

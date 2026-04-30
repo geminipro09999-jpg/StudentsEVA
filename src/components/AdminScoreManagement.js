@@ -109,16 +109,7 @@ export default function AdminScoreManagement({ vivaId, student, lecturerId, init
     }
 
     return (
-        <div className="flex gap-2">
-            {!isVerified && (
-                <button 
-                    onClick={handleVerify} 
-                    disabled={loading}
-                    className="btn btn-secondary py-1 px-3 text-xs border-success text-success hover:bg-success/10"
-                >
-                    {loading ? "..." : "Verify"}
-                </button>
-            )}
+        <div className="flex justify-end gap-2">
             <button 
                 onClick={handleOpenEdit} 
                 className="btn btn-secondary py-1 px-3 text-xs"

@@ -26,12 +26,13 @@ export async function createViva(data) {
 
         if (vivaError) throw vivaError;
 
-        // 2. Create Criteria
         if (criteria && criteria.length > 0) {
             const criteriaData = criteria.map(c => ({
                 viva_id: viva.id,
                 name: c.name,
-                max_marks: c.max_marks
+                max_marks: c.max_marks,
+                is_required: c.is_required !== undefined ? c.is_required : true,
+                admin_only: c.admin_only || false
             }));
             const { error: criteriaError } = await supabase
                 .from('viva_criteria')

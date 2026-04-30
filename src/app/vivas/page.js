@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import VivaFormModal from "@/components/VivaFormModal";
 import QuizImportModal from "@/components/QuizImportModal";
+import DeleteVivaButton from "@/components/DeleteVivaButton";
 import { getUsers } from "@/app/actions/usersActions";
 
 export default async function VivasPage() {
@@ -19,9 +20,7 @@ export default async function VivasPage() {
     let potentialPanelists = [];
     if (isAdmin) {
         const { data: users } = await getUsers();
-        potentialPanelists = users?.filter(u => 
-            u.roles?.some(r => ['lecturer', 'incubator_staff', 'admin'].includes(r))
-        ) || [];
+        potentialPanelists = users || [];
     }
 
     return (
@@ -74,14 +73,7 @@ export default async function VivasPage() {
                                 {isAdmin ? '⚙️ Manage Event' : '📝 Score Students'}
                             </Link>
                             {isAdmin && (
-                                <form action={async () => {
-                                    "use server";
-                                    await deleteViva(viva.id);
-                                }}>
-                                    <button className="btn btn-secondary border-danger text-danger hover:bg-danger/10 py-3 px-4">
-                                        🗑️
-                                    </button>
-                                </form>
+                                <DeleteVivaButton vivaId={viva.id} />
                             )}
                         </div>
                     </div>

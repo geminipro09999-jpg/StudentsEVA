@@ -28,24 +28,26 @@ export default function ExportVivaReport({ viva, groupedScores }) {
         doc.text(`Criteria: ${criteriaList}`, 14, 60);
 
         // Table Data
-        const tableColumn = ["Student", "UT Number", "Lecturer", "Scores", "Total", "Remark"];
+        const criteriaNames = viva.criteria.map(c => c.name);
+        const tableColumn = ["Student", "UT Number", "Lecturer", ...criteriaNames, "Total", "Remark"];
         const tableRows = [];
 
         Object.values(groupedScores).forEach(group => {
-            const scoresStr = Object.entries(group.criteriaScores)
-                .map(([cid, score]) => {
-                    const c = viva.criteria.find(crit => crit.id === cid);
-                    return `${c?.name}: ${score}`;
-                }).join("\n");
-
-            tableRows.push([
+            const row = [
                 group.student.name,
                 group.student.student_id,
-                group.lecturer.name,
-                scoresStr,
-                `${group.total} / ${group.max_total}`,
-                group.remark || "-"
-            ]);
+                group.lecturerName
+            ];
+
+            // Add individual criteria scores
+            viva.criteria.forEach(c => {
+                row.push(group.criteriaScores[c.id] || 0);
+            });
+
+            row.push(`${group.total} / ${group.max_total}`);
+            row.push(group.remark || "-");
+            
+            tableRows.push(row);
         });
 
         autoTable(doc, {
@@ -53,11 +55,10 @@ export default function ExportVivaReport({ viva, groupedScores }) {
             head: [tableColumn],
             body: tableRows,
             theme: 'grid',
-            headStyles: { fillColor: [66, 133, 244], fontSize: 9 },
-            styles: { fontSize: 8, cellPadding: 3 },
+            headStyles: { fillColor: [66, 133, 244], fontSize: 8 },
+            styles: { fontSize: 7, cellPadding: 2 },
             columnStyles: {
-                3: { cellWidth: 40 }, // Scores column
-                5: { cellWidth: 40 }  // Remark column
+                [tableColumn.length - 1]: { cellWidth: 30 }  // Remark column
             }
         });
 

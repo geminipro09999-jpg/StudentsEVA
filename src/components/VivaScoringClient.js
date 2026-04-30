@@ -1,36 +1,40 @@
 "use client";
 
-import { useState } from "react";
-import { findStudentByUT, submitScores, getStudentScores } from "@/app/actions/scoringActions";
+import { useState, useEffect } from "react";
+import { findStudentByUT, submitScores, getStudentScores, getStudents } from "@/app/actions/scoringActions";
 import toast from "react-hot-toast";
 
-export default function VivaScoringClient({ viva }) {
+export default function VivaScoringClient({ viva, isAdmin }) {
     const [utNumber, setUtNumber] = useState("");
     const [student, setStudent] = useState(null);
+    const [allStudents, setAllStudents] = useState([]);
     const [searching, setSearching] = useState(false);
     const [scores, setScores] = useState({});
     const [existingScores, setExistingScores] = useState([]);
     const [remark, setRemark] = useState("");
     const [submitting, setSubmitting] = useState(false);
 
-    const handleSearch = async (e) => {
-        e.preventDefault();
-        if (!utNumber.trim()) return;
+    useEffect(() => {
+        const fetchAll = async () => {
+            const res = await getStudents();
+            if (res.data) setAllStudents(res.data);
+        };
+        fetchAll();
+    }, []);
 
+    const performSearch = async (ut) => {
         setSearching(true);
         setStudent(null);
         setExistingScores([]);
         setScores({});
         setRemark("");
 
-        const res = await findStudentByUT(utNumber.trim());
+        const res = await findStudentByUT(ut);
         if (res.data) {
             setStudent(res.data);
-            // Fetch existing scores for this student in this viva
             const scoreRes = await getStudentScores(viva.id, res.data.id);
             if (scoreRes.data) {
                 setExistingScores(scoreRes.data);
-                // Pre-fill scores if they exist
                 const initialScores = {};
                 let initialRemark = "";
                 scoreRes.data.forEach(s => {
@@ -41,9 +45,22 @@ export default function VivaScoringClient({ viva }) {
                 setRemark(initialRemark);
             }
         } else {
-            toast.error("Student not found with this UT Number.");
+            toast.error("Student not found.");
         }
         setSearching(false);
+    };
+
+    const handleSearch = async (e) => {
+        e.preventDefault();
+        if (!utNumber.trim()) return;
+        performSearch(utNumber.trim());
+    };
+
+    const handleSelectStudent = (e) => {
+        const val = e.target.value;
+        if (!val) return;
+        setUtNumber(val);
+        performSearch(val);
     };
 
     const updateScore = (criteriaId, value, max) => {
@@ -58,10 +75,12 @@ export default function VivaScoringClient({ viva }) {
     const handleSubmit = async (e) => {
         e.preventDefault();
         
-        // Validate all criteria have scores
-        const missing = viva.criteria.filter(c => scores[c.id] === undefined || scores[c.id] === "");
+        // Validate required criteria have scores
+        const missing = viva.criteria.filter(c => 
+            (c.is_required !== false) && (scores[c.id] === undefined || scores[c.id] === "")
+        );
         if (missing.length > 0) {
-            return toast.error(`Please provide scores for: ${missing.map(m => m.name).join(", ")}`);
+            return toast.error(`Required metrics missing: ${missing.map(m => m.name).join(", ")}`);
         }
 
         setSubmitting(true);
@@ -90,18 +109,45 @@ export default function VivaScoringClient({ viva }) {
             <div className="space-y-6">
                 <div className="card accent">
                     <h3 className="text-xl font-bold mb-4">Find Student</h3>
-                    <form onSubmit={handleSearch} className="flex gap-2">
-                        <input 
-                            type="text" 
-                            value={utNumber} 
-                            onChange={(e) => setUtNumber(e.target.value)}
-                            placeholder="Enter UT Number (e.g., UT001)"
-                            className="flex-1"
-                        />
-                        <button type="submit" disabled={searching} className="btn btn-primary">
-                            {searching ? "Searching..." : "Search"}
-                        </button>
-                    </form>
+                    <div className="space-y-4">
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-secondary uppercase tracking-widest">Quick Select</label>
+                            <select 
+                                onChange={handleSelectStudent}
+                                className="w-full"
+                                value={student?.student_id || ""}
+                            >
+                                <option value="">-- Choose Student --</option>
+                                {allStudents.map(s => (
+                                    <option key={s.id} value={s.student_id}>
+                                        {s.name} ({s.student_id})
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="relative">
+                            <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                                <div className="w-full border-t border-card-border"></div>
+                            </div>
+                            <div className="relative flex justify-center text-xs uppercase">
+                                <span className="bg-surface px-2 text-tertiary">Or Search by UT</span>
+                            </div>
+                        </div>
+
+                        <form onSubmit={handleSearch} className="flex gap-2">
+                            <input 
+                                type="text" 
+                                value={utNumber} 
+                                onChange={(e) => setUtNumber(e.target.value)}
+                                placeholder="Enter UT Number (e.g., UT001)"
+                                className="flex-1"
+                            />
+                            <button type="submit" disabled={searching} className="btn btn-primary px-6">
+                                {searching ? "..." : "Search"}
+                            </button>
+                        </form>
+                    </div>
                 </div>
 
                 {student && (
@@ -213,10 +259,16 @@ export default function VivaScoringClient({ viva }) {
                         
                         <h3 className="text-xl font-bold mb-6">Scoring Form</h3>
                         <form onSubmit={handleSubmit} className="space-y-6">
-                            {viva.criteria.map((c) => (
+                            {viva.criteria
+                                .filter(c => !c.admin_only || isAdmin)
+                                .map((c) => (
                                 <div key={c.id}>
                                     <div className="flex justify-between mb-2">
-                                        <label className="m-0">{c.name}</label>
+                                        <label className="m-0 flex items-center gap-2">
+                                            {c.name}
+                                            {c.is_required === false && <span className="text-[10px] font-bold text-tertiary uppercase tracking-tighter bg-surface-container-highest px-1.5 py-0.5 rounded">Optional</span>}
+                                            {c.admin_only && <span className="text-[10px] font-bold text-primary uppercase tracking-tighter bg-primary/10 px-1.5 py-0.5 rounded border border-primary/20">Admin Only</span>}
+                                        </label>
                                         <span className="text-xs text-secondary">Max: {c.max_marks}</span>
                                     </div>
                                     <input 
@@ -228,7 +280,7 @@ export default function VivaScoringClient({ viva }) {
                                         onChange={(e) => updateScore(c.id, e.target.value, c.max_marks)}
                                         placeholder={`Score (0-${c.max_marks})`}
                                         disabled={isLocked}
-                                        required
+                                        required={c.is_required !== false}
                                     />
                                 </div>
                             ))}

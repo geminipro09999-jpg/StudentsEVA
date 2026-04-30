@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import AdminScoreManagement from "@/components/AdminScoreManagement";
 import ExportVivaReport from "@/components/ExportVivaReport";
+import VivaMetricImportModal from "@/components/VivaMetricImportModal";
 
 export default async function VivaDetailPage({ params }) {
     const { id } = await params;
@@ -19,27 +20,60 @@ export default async function VivaDetailPage({ params }) {
     const { data: viva } = await getVivaDetails(id);
     const { data: scores } = await getAllScoresForViva(id);
 
-    // Group scores by student and lecturer
-    const groupedScores = scores?.reduce((acc, score) => {
-        const key = `${score.student_id}_${score.lecturer_id}`;
-        if (!acc[key]) {
-            acc[key] = {
+    const vivaTotal = viva?.criteria.reduce((s, c) => s + c.max_marks, 0) || 0;
+    
+    // Group scores by student (merge different lecturers like Admin import + Staff entry)
+    const groupedScoresMap = scores?.reduce((acc, score) => {
+        const studentId = score.student_id;
+        
+        if (!acc[studentId]) {
+            acc[studentId] = {
                 student: score.students,
-                lecturer: score.users,
+                lecturerNames: new Set(),
                 criteriaScores: {},
                 remark: score.remark,
                 is_verified: score.is_verified,
                 is_locked: score.is_locked,
-                total: 0,
-                max_total: 0,
-                updated_at: score.updated_at
+                updated_at: score.updated_at,
+                lecturerId: score.lecturer_id // Default lecturer ID for editing
             };
         }
-        acc[key].criteriaScores[score.criteria_id] = score.score;
-        acc[key].total += score.score;
-        acc[key].max_total += score.viva_criteria.max_marks;
+
+        // Add lecturer name to the set (to display who contributed)
+        acc[studentId].lecturerNames.add(score.users.name);
+        
+        // If this record has more 'viva' like criteria or is from a non-admin, prefer this lecturerId
+        // In this project, 'Super Admin' is usually the one importing quiz marks
+        if (score.users.name !== 'Super Admin' && score.users.name !== 'admin') {
+            acc[studentId].lecturerId = score.lecturer_id;
+        }
+
+        // Merge scores
+        acc[studentId].criteriaScores[score.criteria_id] = score.score;
+        
+        // Keep the latest update time
+        if (new Date(score.updated_at) > new Date(acc[studentId].updated_at)) {
+            acc[studentId].updated_at = score.updated_at;
+        }
+
+        // Aggregate status
+        if (score.is_locked) acc[studentId].is_locked = true;
+        if (score.is_verified) acc[studentId].is_verified = true;
+        if (score.remark && !acc[studentId].remark) acc[studentId].remark = score.remark;
+
         return acc;
     }, {});
+
+    // Convert map to array and finalize display fields
+    const groupedScores = Object.values(groupedScoresMap || {}).map(group => {
+        const total = Object.values(group.criteriaScores).reduce((sum, s) => sum + s, 0);
+        return {
+            ...group,
+            total,
+            max_total: vivaTotal,
+            lecturerName: Array.from(group.lecturerNames).join(', ')
+        };
+    });
 
     const totalEvaluations = Object.keys(groupedScores || {}).length;
     const verifiedEvaluations = Object.values(groupedScores || {}).filter(g => g.is_verified).length;
@@ -59,7 +93,10 @@ export default async function VivaDetailPage({ params }) {
                             <span>📅 Scheduled: <strong>{new Date(viva?.viva_date).toLocaleDateString(undefined, { dateStyle: 'full' })}</strong></span>
                         </p>
                     </div>
-                    <ExportVivaReport viva={viva} groupedScores={groupedScores} />
+                    <div className="flex gap-3">
+                        <VivaMetricImportModal vivaId={id} criteria={viva.criteria} />
+                        <ExportVivaReport viva={viva} groupedScores={groupedScores} />
+                    </div>
                 </div>
             </div>
 
@@ -106,9 +143,11 @@ export default async function VivaDetailPage({ params }) {
                                     <tr>
                                         <th>Student</th>
                                         <th>Lecturer</th>
-                                        <th>Score</th>
+                                        {viva?.criteria.map(c => (
+                                            <th key={c.id}>{c.name}</th>
+                                        ))}
+                                        <th>Total</th>
                                         <th>Status</th>
-                                        <th>Verified</th>
                                         <th className="text-right">Actions</th>
                                     </tr>
                                 </thead>
@@ -127,9 +166,16 @@ export default async function VivaDetailPage({ params }) {
                                                 </div>
                                             </td>
                                             <td>
-                                                <p className="text-sm m-0">{group.lecturer.name}</p>
+                                                <p className="text-sm m-0">{group.lecturerName}</p>
                                                 <p className="text-[10px] text-tertiary">{new Date(group.updated_at).toLocaleDateString()}</p>
                                             </td>
+                                            {/* Individual Scores */}
+                                            {viva.criteria.map(c => (
+                                                <td key={c.id} className="text-sm font-medium">
+                                                    {group.criteriaScores[c.id] !== undefined ? group.criteriaScores[c.id] : '—'}
+                                                    <span className="text-[10px] text-tertiary ml-1">/{c.max_marks}</span>
+                                                </td>
+                                            ))}
                                             <td>
                                                 <div className="flex flex-col">
                                                     <span className="font-bold text-sm">{group.total} / {group.max_total}</span>
@@ -141,18 +187,12 @@ export default async function VivaDetailPage({ params }) {
                                                     {group.is_locked ? 'LOCKED' : 'DRAFT'}
                                                 </div>
                                             </td>
-                                            <td>
-                                                {group.is_verified ? (
-                                                    <span className="text-success text-xl">✓</span>
-                                                ) : (
-                                                    <span className="text-tertiary opacity-30">—</span>
-                                                )}
-                                            </td>
+
                                             <td className="text-right">
                                                 <AdminScoreManagement 
                                                     vivaId={id} 
                                                     student={group.student}
-                                                    lecturerId={group.lecturer.id}
+                                                    lecturerId={group.lecturerId}
                                                     initialScores={group.criteriaScores}
                                                     initialRemark={group.remark}
                                                     criteria={viva.criteria}
@@ -177,7 +217,7 @@ export default async function VivaDetailPage({ params }) {
 
                 <div className="space-y-6">
                     <div className="card">
-                        <h3 className="text-sm font-bold uppercase tracking-widest text-accent-color mb-4">Framework</h3>
+                        <h3 className="text-sm font-bold uppercase tracking-widest text-accent-color mb-4">Metric Names</h3>
                         <div className="space-y-2">
                             {viva?.criteria.map((c) => (
                                 <div key={c.id} className="p-3 rounded-xl bg-surface-container-low border border-card-border flex justify-between items-center">

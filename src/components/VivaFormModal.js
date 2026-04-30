@@ -10,14 +10,17 @@ export default function VivaFormModal({ potentialPanelists }) {
     const [formData, setFormData] = useState({
         name: "",
         date: "",
-        criteria: [{ name: "Technical", max_marks: 50 }, { name: "Communication", max_marks: 50 }],
+        criteria: [
+            { name: "Technical", max_marks: 50, is_required: true, admin_only: false }, 
+            { name: "Communication", max_marks: 50, is_required: true, admin_only: false }
+        ],
         panelists: []
     });
 
     const addCriteria = () => {
         setFormData({
             ...formData,
-            criteria: [...formData.criteria, { name: "", max_marks: 10 }]
+            criteria: [...formData.criteria, { name: "", max_marks: 10, is_required: true, admin_only: false }]
         });
     };
 
@@ -30,7 +33,12 @@ export default function VivaFormModal({ potentialPanelists }) {
 
     const updateCriteria = (index, field, value) => {
         const newCriteria = [...formData.criteria];
-        newCriteria[index][field] = field === 'max_marks' ? parseInt(value) : value;
+        if (field === 'max_marks') {
+            const parsed = parseInt(value);
+            newCriteria[index][field] = isNaN(parsed) ? 0 : parsed;
+        } else {
+            newCriteria[index][field] = value;
+        }
         setFormData({ ...formData, criteria: newCriteria });
     };
 
@@ -62,7 +70,10 @@ export default function VivaFormModal({ potentialPanelists }) {
                 name: "",
                 date: "",
                 deadline: "",
-                criteria: [{ name: "Technical", max_marks: 50 }, { name: "Communication", max_marks: 50 }],
+                criteria: [
+                    { name: "Technical", max_marks: 50, is_required: true, admin_only: false }, 
+                    { name: "Communication", max_marks: 50, is_required: true, admin_only: false }
+                ],
                 panelists: []
             });
         } else {
@@ -142,14 +153,32 @@ export default function VivaFormModal({ potentialPanelists }) {
                                                     className="bg-surface-container-high border-none"
                                                 />
                                             </div>
-                                            <div className="w-28 space-y-1">
-                                                <label className="text-[10px] opacity-70">Weight (Max)</label>
+                                            <div className="w-24 space-y-1">
+                                                <label className="text-[10px] opacity-70">Weight</label>
                                                 <input 
                                                     type="number" 
                                                     value={c.max_marks} 
                                                     onChange={(e) => updateCriteria(index, 'max_marks', e.target.value)}
                                                     placeholder="100"
                                                     className="bg-surface-container-high border-none text-center"
+                                                />
+                                            </div>
+                                            <div className="flex flex-col items-center gap-1 mb-2">
+                                                <label className="text-[10px] opacity-70">Required</label>
+                                                <input 
+                                                    type="checkbox" 
+                                                    checked={c.is_required !== false} 
+                                                    onChange={(e) => updateCriteria(index, 'is_required', e.target.checked)}
+                                                    className="w-5 h-5 accent-accent-color cursor-pointer"
+                                                />
+                                            </div>
+                                            <div className="flex flex-col items-center gap-1 mb-2">
+                                                <label className="text-[10px] opacity-70 text-primary font-bold">Admin Only</label>
+                                                <input 
+                                                    type="checkbox" 
+                                                    checked={c.admin_only || false} 
+                                                    onChange={(e) => updateCriteria(index, 'admin_only', e.target.checked)}
+                                                    className="w-5 h-5 accent-primary cursor-pointer"
                                                 />
                                             </div>
                                             <button 

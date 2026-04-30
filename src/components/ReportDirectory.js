@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { getAllScoresForViva } from "@/app/actions/scoringActions";
+import { getVivaDetails } from "@/app/actions/vivaActions";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -62,7 +63,10 @@ export default function ReportDirectory({ feedbacks, vivas = [], quizzes = [], a
         setExporting(viva.id);
         const res = await getAllScoresForViva(viva.id);
         if (res.data) {
-            // Group scores logic
+            // Calculate total potential marks for this viva
+            const { data: vivaMeta } = await getVivaDetails(viva.id);
+            const vivaTotal = vivaMeta?.criteria.reduce((s, c) => s + c.max_marks, 0) || 0;
+
             let grouped = res.data.reduce((acc, score) => {
                 const key = `${score.student_id}_${score.lecturer_id}`;
                 if (!acc[key]) {
@@ -72,12 +76,11 @@ export default function ReportDirectory({ feedbacks, vivas = [], quizzes = [], a
                         criteriaScores: {},
                         remark: score.remark,
                         total: 0,
-                        max_total: 0
+                        max_total: vivaTotal
                     };
                 }
                 acc[key].criteriaScores[score.criteria_id] = score.score;
                 acc[key].total += score.score;
-                acc[key].max_total += score.viva_criteria.max_marks;
                 return acc;
             }, {});
 
@@ -103,20 +106,41 @@ export default function ReportDirectory({ feedbacks, vivas = [], quizzes = [], a
             doc.text(`Event: ${viva.name}`, 14, 40);
             doc.text(`Date: ${new Date(viva.viva_date).toLocaleDateString()}`, 14, 47);
 
-            const tableColumn = ["Student", "UT Number", "Lecturer", "Total", "Remark"];
-            const tableRows = Object.values(grouped).map(g => [
-                g.student.name,
-                g.student.student_id,
-                g.lecturer.name,
-                `${g.total} / ${g.max_total}`,
-                g.remark || "-"
-            ]);
+            // Extract unique criteria for this viva from the data
+            const criteriaMap = {};
+            res.data.forEach(s => {
+                if (!criteriaMap[s.viva_criteria.id]) {
+                    criteriaMap[s.viva_criteria.id] = s.viva_criteria.name;
+                }
+            });
+            const criteriaIds = Object.keys(criteriaMap);
+            const criteriaNames = Object.values(criteriaMap);
+
+            const tableColumn = ["Student", "UT Number", "Lecturer", ...criteriaNames, "Total", "Remark"];
+            const tableRows = Object.values(grouped).map(g => {
+                const row = [
+                    g.student.name,
+                    g.student.student_id,
+                    g.lecturer.name
+                ];
+                
+                // Individual criteria scores
+                criteriaIds.forEach(cid => {
+                    row.push(g.criteriaScores[cid] || 0);
+                });
+
+                row.push(`${g.total} / ${g.max_total}`);
+                row.push(g.remark || "-");
+                return row;
+            });
 
             autoTable(doc, {
                 startY: 55,
                 head: [tableColumn],
                 body: tableRows,
-                theme: 'grid'
+                theme: 'grid',
+                headStyles: { fillColor: [66, 133, 244], fontSize: 8 },
+                styles: { fontSize: 7, cellPadding: 2 }
             });
 
             const groupSuffix = groupFilter ? `_${groupFilter}` : "";
