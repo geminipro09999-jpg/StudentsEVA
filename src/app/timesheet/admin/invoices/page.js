@@ -125,8 +125,7 @@ export default function AdminInvoicesPage() {
             doc.text([
                 `Email: ${staff.staff_email || staff.email}`,
                 `Invoice No: INV-${String(inv.month_no || new Date(`${inv.month} 1, ${inv.year}`).getMonth() + 1).padStart(2, '0')}`,
-                `Date: 15/${String(inv.month_no || new Date(`${inv.month} 1, ${inv.year}`).getMonth() + 1).padStart(2, '0')}/${inv.year}`,
-                `Period: ${inv.month} ${inv.year}`
+                `Date: 15/${String(inv.month_no || new Date(`${inv.month} 1, ${inv.year}`).getMonth() + 1).padStart(2, '0')}/${inv.year}`
             ], 20, 58);
 
             // Client Info (Right)
@@ -202,7 +201,7 @@ export default function AdminInvoicesPage() {
             // Signatures
             doc.setTextColor(0, 0, 0);
             doc.setFontSize(10);
-            doc.text('Lecturer Signature', 20, finalY + 45);
+            doc.text('Signature', 20, finalY + 45);
 
             if (staff.e_signature) {
                 try {

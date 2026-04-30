@@ -273,7 +273,7 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
             // 9. Signatures
             doc.setTextColor(0, 0, 0);
             doc.setFontSize(10);
-            doc.text('Lecturer Signature', 20, finalY + 45);
+            doc.text('Signature', 20, finalY + 45);
 
             if (lecturerInfo?.e_signature) {
                 try {
@@ -372,14 +372,14 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
                         ),
                         new Paragraph({ children: [new TextRun({ text: `Tel: ${lecturerInfo?.phone || '-'}`, size: 20 })] }),
                         new Paragraph({ children: [new TextRun({ text: `Email: ${lecturerInfo?.staff_email || lecturerInfo?.email}`, size: 20 })] }),
-                        new Paragraph({ children: [new TextRun({ text: 'Period: ', bold: true, size: 22 }), new TextRun({ text: periodLabel, size: 22 })], spacing: { after: 80 } }),
+
                         new Paragraph({ children: [new TextRun({ text: `Generated: ${new Date().toLocaleDateString()}`, size: 18, color: '999999' })], spacing: { after: 300 } }),
                         new Table({ rows: tableRows, width: { size: 100, type: WidthType.PERCENTAGE } }),
                         new Paragraph({ text: '', spacing: { before: 200 } }),
                         new Paragraph({ children: [new TextRun({ text: `Payment Rate: ${activeRate.toLocaleString()} LKR per ${currentUnit}`, bold: true, size: 18 })] }),
                         new Paragraph({ text: '', spacing: { before: 400 } }),
                         new Paragraph({ children: [new TextRun({ text: '____________________________                                              ____________________________', size: 20 })], spacing: { before: 400 } }),
-                        new Paragraph({ children: [new TextRun({ text: '      Lecturer Signature                                                                   Admin Signature', size: 18, color: '666666' })] }),
+                        new Paragraph({ children: [new TextRun({ text: '      Signature                                                                   Admin Signature', size: 18, color: '666666' })] }),
                         new Paragraph({ text: '', spacing: { before: 300 } }),
                         new Paragraph({ children: [new TextRun({ text: 'This is a system-generated invoice from the Student Evaluation System.', italics: true, size: 16, color: '999999' })], alignment: AlignmentType.CENTER }),
                     ],
@@ -644,7 +644,7 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
 
                     {/* Signatures */}
                     <div className="mt-8 pt-8 border-t border-transparent">
-                        <p className="font-bold mb-2">Lecturer Signature</p>
+                        <p className="font-bold mb-2">Signature</p>
                         {lecturerInfo?.e_signature ? (
                             <img
                                 src={lecturerInfo.e_signature}
