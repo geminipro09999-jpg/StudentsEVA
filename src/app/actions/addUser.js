@@ -26,14 +26,23 @@ export async function addUser(formData) {
 
         const hashedPassword = await bcrypt.hash(formData.get("password"), 10);
 
+        const paymentMethods = formData.getAll("payment_methods");
+        if (paymentMethods.length === 0) {
+            if (roles.includes('lecturer')) paymentMethods.push('unit');
+            if (roles.includes('lecturer_hourly')) paymentMethods.push('hourly');
+            if (roles.includes('incubator_staff')) paymentMethods.push('monthly');
+            if (paymentMethods.length === 0) paymentMethods.push('unit');
+        }
+
         const insertData = {
             name: formData.get("name"),
             email: email,
             password: hashedPassword,
             role: roles[0],
             roles: roles,
+            payment_methods: paymentMethods,
             hourly_rate: formData.get("hourly_rate") ? Number(formData.get("hourly_rate")) : 3000,
-            payment_unit: formData.get("payment_unit") || 'hour',
+            unit_rate: formData.get("unit_rate") ? Number(formData.get("unit_rate")) : 0,
             monthly_salary: formData.get("monthly_salary") ? Number(formData.get("monthly_salary")) : 0
         };
 

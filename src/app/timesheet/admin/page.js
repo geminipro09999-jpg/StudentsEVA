@@ -19,7 +19,7 @@ export default async function TimesheetAdminPage() {
     // Fetch ALL timesheet entries with user info joined
     const { data: entries } = await supabase
         .from('timesheets')
-        .select('*, users(id, name, email)')
+        .select('*, users(id, name, email, roles, payment_methods, unit_rate, hourly_rate)')
         .order('work_date', { ascending: false });
 
     // Fetch all non-admin users as potential lecturers (covers both role and roles fields)

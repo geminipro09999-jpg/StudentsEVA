@@ -29,7 +29,7 @@ export default async function InvoicePage() {
     const { data: entries } = await query.order('work_date', { ascending: true });
 
     // Fetch lecturers (for selection if admin)
-    let lecturerQuery = supabase.from('users').select('id, name, email, roles, role, address, phone, account_name, bank_name, account_no, branch, e_signature');
+    let lecturerQuery = supabase.from('users').select('id, name, email, roles, role, address, phone, account_name, bank_name, account_no, branch, e_signature, payment_methods, hourly_rate, unit_rate, monthly_salary');
 
     if (!isAdmin) {
         lecturerQuery = lecturerQuery.eq('id', session.user.id);

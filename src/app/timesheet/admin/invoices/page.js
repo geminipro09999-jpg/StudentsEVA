@@ -9,6 +9,11 @@ import toast from "react-hot-toast";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
+const MONTH_NAMES = [
+    '', 'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+];
+
 export default function AdminInvoicesPage() {
     const [invoices, setInvoices] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -16,6 +21,11 @@ export default function AdminInvoicesPage() {
     const [updatingId, setUpdatingId] = useState(null);
     const [deductionsMap, setDeductionsMap] = useState({});
     const [baseAmtMap, setBaseAmtMap] = useState({});
+    const [descriptionsMap, setDescriptionsMap] = useState({});
+    const [ratesMap, setRatesMap] = useState({});
+    const [invoiceNosMap, setInvoiceNosMap] = useState({});
+    const [datesMap, setDatesMap] = useState({});
+    const [paymentBasisFilter, setPaymentBasisFilter] = useState("all");
 
     const { data: session, status } = useSession();
     const router = useRouter();
@@ -47,12 +57,24 @@ export default function AdminInvoicesPage() {
             setInvoices(data || []);
             const dMap = {};
             const bMap = {};
+            const descMap = {};
+            const rMap = {};
+            const nMap = {};
+            const dateMap = {};
             (data || []).forEach(inv => {
                 dMap[inv.id] = inv.deductions || 0;
                 bMap[inv.id] = inv.amount || 0;
+                descMap[inv.id] = inv.invoice_data?.description || "";
+                rMap[inv.id] = inv.invoice_data?.activeRate || inv.invoice_data?.hourlyRate || 0;
+                nMap[inv.id] = inv.invoice_data?.displayInvoiceNo || String(MONTH_NAMES.indexOf(inv.month)).padStart(4, '0');
+                dateMap[inv.id] = inv.invoice_data?.displayDate || `15/${String(MONTH_NAMES.indexOf(inv.month)).padStart(2, '0')}/${inv.year}`;
             });
             setDeductionsMap(dMap);
             setBaseAmtMap(bMap);
+            setDescriptionsMap(descMap);
+            setRatesMap(rMap);
+            setInvoiceNosMap(nMap);
+            setDatesMap(dateMap);
         } catch (err) {
             setError(err.message);
         }
@@ -122,10 +144,13 @@ export default function AdminInvoicesPage() {
             doc.text(staff.name || 'Staff Member', 20, 50);
             doc.setFont('helvetica', 'normal');
             doc.setFontSize(10);
+            const displayInvNo = invoiceNosMap[inv.id] || String(inv.month_no || MONTH_NAMES.indexOf(inv.month)).padStart(4, '0');
+            const displayDate = datesMap[inv.id] || `15/${String(inv.month_no || MONTH_NAMES.indexOf(inv.month)).padStart(2, '0')}/${inv.year}`;
+
             doc.text([
                 `Email: ${staff.staff_email || staff.email}`,
-                `Invoice No: 00 ${String(inv.month_no || new Date(`${inv.month} 1, ${inv.year}`).getMonth() + 1).padStart(2, '0')}`,
-                `Date: 15/${String(inv.month_no || new Date(`${inv.month} 1, ${inv.year}`).getMonth() + 1).padStart(2, '0')}/${inv.year}`
+                `Invoice No: ${displayInvNo}`,
+                `Date: ${displayDate}`
             ], 20, 58);
 
             // Client Info (Right)
@@ -136,21 +161,28 @@ export default function AdminInvoicesPage() {
                 'unicomtic@gmail.com'
             ], 140, 50);
 
-            const isFixed = inv.invoice_data?.invoiceType === 'fixed';
+            const basis = inv.invoice_data?.paymentBasis || (inv.invoice_data?.invoiceType === 'fixed' ? 'monthly' : 'hourly');
+            const isMonthly = basis === 'monthly';
+            const unitLabel = basis === 'hourly' ? 'Hrs' : (basis === 'unit' ? 'Units' : 'Month');
+            const displayUnit = basis === 'monthly' ? '1' : (basis === 'hourly' ? (inv.invoice_data?.totalHours || 0).toFixed(2) : (inv.invoice_data?.totalUnits || 0));
+
+            const currentDescription = descriptionsMap[inv.id] || inv.invoice_data?.description || `consultation and development services for the month of ${inv.month} ${inv.year}`;
+
+            const head = isMonthly ? [['Description', 'Total - LKR']] : [['Description', 'Unit', 'Rate per Unit', 'Total - LKR']];
+            const body = isMonthly 
+                ? [[currentDescription, currentBase.toLocaleString()]]
+                : [[
+                    currentDescription,
+                    `${displayUnit} ${unitLabel}`,
+                    (ratesMap[inv.id] || inv.invoice_data?.activeRate || inv.invoice_data?.hourlyRate || 0).toLocaleString(),
+                    currentBase.toLocaleString()
+                ]];
 
             // Table
             autoTable(doc, {
                 startY: 85,
-                head: isFixed ? [['Description', 'Total - LKR']] : [['Quantity', 'Description', 'Unit Price', 'Total - LKR']],
-                body: [isFixed
-                    ? [inv.invoice_data?.description || `consultation and development services for the month of ${inv.month} ${inv.year}`, currentBase.toLocaleString()]
-                    : [
-                        `${(inv.invoice_data?.totalHours || 0).toFixed(2)} Hrs`,
-                        inv.invoice_data?.description || `consultation and development services for the month of ${inv.month} ${inv.year}`,
-                        (inv.invoice_data?.hourlyRate || 0).toLocaleString(),
-                        currentBase.toLocaleString()
-                    ]
-                ],
+                head: head,
+                body: body,
                 theme: 'grid',
                 headStyles: {
                     fillColor: [255, 255, 255],
@@ -164,9 +196,9 @@ export default function AdminInvoicesPage() {
                     lineWidth: 0.1,
                     lineColor: [200, 200, 200]
                 },
-                columnStyles: isFixed
+                columnStyles: isMonthly 
                     ? { 0: { cellWidth: 'auto' }, 1: { cellWidth: 40, halign: 'right' } }
-                    : { 0: { cellWidth: 25 }, 1: { cellWidth: 'auto' }, 2: { cellWidth: 35, halign: 'right' }, 3: { cellWidth: 35, halign: 'right' } }
+                    : { 0: { cellWidth: 'auto' }, 1: { cellWidth: 30, halign: 'center' }, 2: { cellWidth: 35, halign: 'right' }, 3: { cellWidth: 35, halign: 'right' } }
             });
 
             const finalY = doc.lastAutoTable.finalY + 15;
@@ -199,13 +231,13 @@ export default function AdminInvoicesPage() {
             doc.text(finalTotal.toLocaleString(), 195, finalY + 25, { align: 'right' });
 
             // Signatures
-            doc.setTextColor(0, 0, 0);
-            doc.setFontSize(10);
-            doc.text('Signature', 20, finalY + 45);
-
-            if (staff.e_signature) {
+            doc.setFontSize(12);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Signature', 140, doc.internal.pageSize.height - 40);
+            
+            if (staff?.e_signature) {
                 try {
-                    doc.addImage(staff.e_signature, 'PNG', 20, finalY + 50, 40, 15);
+                    doc.addImage(staff.e_signature, 'PNG', 140, doc.internal.pageSize.height - 35, 40, 20);
                 } catch (e) {
                     console.error("Signature Render Error:", e);
                 }
@@ -265,37 +297,28 @@ export default function AdminInvoicesPage() {
         setEditingItems(editingItems.filter((_, i) => i !== index));
     };
 
-    const handleRateChange = (val) => {
-        const newRate = Number(val);
-        const isFixed = selectedInvoice.invoice_data?.invoiceType === 'fixed';
-        const totalHours = isFixed ? 0 : (selectedInvoice.invoice_data?.totalHours || 0);
-        const newGross = isFixed ? newRate : (totalHours * newRate);
-        setSelectedInvoice(prev => ({
-            ...prev,
-            invoice_data: { ...prev.invoice_data, hourlyRate: newRate, calculatedGross: newGross }
-        }));
-        setBaseAmtMap(prev => ({ ...prev, [selectedInvoice.id]: newGross }));
-    };
-
     const handleSaveCorrections = async () => {
         setIsSavingCorrections(true);
         try {
-            const isFixed = selectedInvoice.invoice_data?.invoiceType === 'fixed';
-            const totalHours = isFixed ? 0 : editingItems.reduce((sum, item) => sum + Number(item.hours || 0), 0);
-            const hourlyRate = selectedInvoice.invoice_data?.hourlyRate || 3000;
-            const calculatedGross = isFixed ? hourlyRate : (totalHours * hourlyRate);
+            const basis = selectedInvoice.invoice_data?.paymentBasis || (selectedInvoice.invoice_data?.invoiceType === 'fixed' ? 'monthly' : 'hourly');
+            const totalHours = basis === 'hourly' ? editingItems.reduce((sum, item) => sum + Number(item.hours || 0), 0) : 0;
+            const totalUnits = basis === 'unit' ? [...new Set(editingItems.map(e => e.work_date))].length : (basis === 'monthly' ? 1 : totalHours);
+            const rate = Number(ratesMap[selectedInvoice.id] || 0);
+            const calculatedGross = basis === 'monthly' ? rate : (totalUnits * rate);
 
             const updatedData = {
                 ...selectedInvoice.invoice_data,
-                items: isFixed ? [] : editingItems,
-                totalHours: isFixed ? 0 : totalHours,
+                description: descriptionsMap[selectedInvoice.id],
+                items: (basis === 'monthly') ? [] : editingItems,
+                totalHours: totalHours,
+                totalUnits: totalUnits,
+                activeRate: rate,
                 calculatedGross
             };
 
             const res = await updateInvoiceData(selectedInvoice.id, updatedData);
             if (res.success) {
                 toast.success("Corrections saved successfully!");
-                // Optimistically update lists and details
                 setBaseAmtMap(prev => ({ ...prev, [selectedInvoice.id]: calculatedGross }));
                 setSelectedInvoice(prev => ({
                     ...prev,
@@ -318,7 +341,9 @@ export default function AdminInvoicesPage() {
     };
 
     if (loading) return <div className="container mt-8 text-center">Loading invoices...</div>;
-    const isFixedModal = selectedInvoice && selectedInvoice.invoice_data?.invoiceType === 'fixed';
+    const basis = selectedInvoice?.invoice_data?.paymentBasis || (selectedInvoice?.invoice_data?.invoiceType === 'fixed' ? 'monthly' : 'hourly');
+    const isFixedModal = basis === 'monthly';
+    const isUnitModal = basis === 'unit';
 
     return (
         <div className="container mt-8 animate-fade-in">
@@ -329,7 +354,34 @@ export default function AdminInvoicesPage() {
 
             {error && <div className="alert alert-danger mb-6">{error}</div>}
 
-            <div className="glass-card mt-8">
+            <div className="flex flex-wrap gap-2 mb-6">
+                <button 
+                    onClick={() => setPaymentBasisFilter('all')} 
+                    className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${paymentBasisFilter === 'all' ? 'bg-primary text-white shadow-lg' : 'bg-secondary/10 text-secondary hover:bg-secondary/20'}`}
+                >
+                    ALL INVOICES
+                </button>
+                <button 
+                    onClick={() => setPaymentBasisFilter('hourly')} 
+                    className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${paymentBasisFilter === 'hourly' ? 'bg-warning text-white shadow-lg' : 'bg-warning/10 text-warning hover:bg-warning/20'}`}
+                >
+                    HOURLY (Lecturer*)
+                </button>
+                <button 
+                    onClick={() => setPaymentBasisFilter('unit')} 
+                    className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${paymentBasisFilter === 'unit' ? 'bg-accent text-white shadow-lg' : 'bg-accent/10 text-accent hover:bg-accent/20'}`}
+                >
+                    PER DAY (Lecturer)
+                </button>
+                <button 
+                    onClick={() => setPaymentBasisFilter('monthly')} 
+                    className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${paymentBasisFilter === 'monthly' ? 'bg-success text-white shadow-lg' : 'bg-success/10 text-success hover:bg-success/20'}`}
+                >
+                    MONTHLY (Incubator)
+                </button>
+            </div>
+
+            <div className="glass-card">
                 <div style={{ overflowX: 'auto' }}>
                     <table className="data-table">
                         <thead>
@@ -350,7 +402,11 @@ export default function AdminInvoicesPage() {
                                     <td colSpan="8" className="text-center py-8 text-secondary">No invoices submitted for review yet.</td>
                                 </tr>
                             ) : (
-                                invoices.map(inv => (
+                                invoices.filter(inv => {
+                                    const b = inv.invoice_data?.paymentBasis || (inv.invoice_data?.invoiceType === 'fixed' ? 'monthly' : 'hourly');
+                                    if (paymentBasisFilter === 'all') return true;
+                                    return b === paymentBasisFilter;
+                                }).map(inv => (
                                     <tr key={inv.id}>
                                         <td>
                                             <div className="font-bold">{inv.users?.name}</div>
@@ -385,21 +441,14 @@ export default function AdminInvoicesPage() {
                                             <span className={`badge ${inv.status === 'approved' ? 'badge-success' : inv.status === 'rejected' ? 'badge-danger' : 'badge-warning'}`}>
                                                 {inv.status.toUpperCase()}
                                             </span>
-                                            {inv.invoice_data?.invoiceType === 'fixed' && (
-                                                <span className="badge badge-secondary ml-2" style={{ background: 'rgba(99, 102, 241, 0.1)', color: 'var(--accent-color)' }}>
-                                                    FIXED
-                                                </span>
-                                            )}
-
-                                            {/* Quick Timesheet Preview (NEW) */}
-                                            {inv.invoice_data?.items && inv.invoice_data.items.length > 0 && (
-                                                <div className="mt-2">
-                                                    <p className="text-[10px] font-bold text-secondary uppercase mb-1">Preview</p>
-                                                    <div className="text-[10px] text-secondary opacity-80 border-t border-card-border pt-1">
-                                                        {inv.invoice_data.items.length} entries ({inv.invoice_data.totalHours?.toFixed(1) || 0} hrs)
-                                                    </div>
-                                                </div>
-                                            )}
+                                            <span className="badge badge-secondary ml-2" style={{ background: 'rgba(99, 102, 241, 0.1)', color: 'var(--accent-color)' }}>
+                                                {(() => {
+                                                    const basis = inv.invoice_data?.paymentBasis || (inv.invoice_data?.invoiceType === 'fixed' ? 'monthly' : 'hourly');
+                                                    if (basis === 'hourly') return 'LECTURER *';
+                                                    if (basis === 'unit') return 'PER DAY';
+                                                    return basis.toUpperCase();
+                                                })()}
+                                            </span>
                                         </td>
                                         <td>
                                             <div className="flex gap-2">
@@ -450,10 +499,10 @@ export default function AdminInvoicesPage() {
                                                 )}
                                                 <button
                                                     onClick={() => openDetails(inv)}
-                                                    className="btn btn-secondary px-3 py-1 text-xs"
-                                                    title="View Breakdown & Edit"
+                                                    className="btn btn-primary px-3 py-1 text-xs"
+                                                    title="Edit & Download PDF"
                                                 >
-                                                    🔍 Details
+                                                    ✏️ Edit
                                                 </button>
                                                 <button
                                                     onClick={() => exportPDF(inv, true)}
@@ -485,10 +534,45 @@ export default function AdminInvoicesPage() {
                     <div className="modal-content animate-fade-in-scale" style={{ maxWidth: '800px', width: '95%' }}>
                         <div className="flex justify-between items-center mb-6">
                             <div>
-                                <h3 className="text-2xl font-bold">Invoice Details</h3>
+                                <h3 className="text-2xl font-bold">Edit Invoice Details</h3>
                                 <p className="text-sm text-secondary">{selectedInvoice.users?.name} — {selectedInvoice.month} {selectedInvoice.year}</p>
                             </div>
-                            <button onClick={closeDetails} className="btn-close">×</button>
+                            <div className="flex gap-2">
+                                <button onClick={() => exportPDF(selectedInvoice, true)} className="btn btn-secondary text-sm">👁️ Preview PDF</button>
+                                <button onClick={() => exportPDF(selectedInvoice, false)} className="btn btn-primary text-sm">📄 Download PDF</button>
+                                <button onClick={closeDetails} className="btn-close">×</button>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 mb-6">
+                            <div className="glass-card p-4">
+                                <h4 className="text-xs font-bold uppercase tracking-wider text-secondary mb-3">Invoice Number</h4>
+                                <input 
+                                    type="text"
+                                    className="w-full bg-transparent border border-card-border rounded px-3 py-2 text-sm focus:border-primary font-mono"
+                                    value={invoiceNosMap[selectedInvoice.id] || ''}
+                                    onChange={e => setInvoiceNosMap({...invoiceNosMap, [selectedInvoice.id]: e.target.value})}
+                                />
+                            </div>
+                            <div className="glass-card p-4">
+                                <h4 className="text-xs font-bold uppercase tracking-wider text-secondary mb-3">Invoice Date</h4>
+                                <input 
+                                    type="text"
+                                    className="w-full bg-transparent border border-card-border rounded px-3 py-2 text-sm focus:border-primary"
+                                    value={datesMap[selectedInvoice.id] || ''}
+                                    onChange={e => setDatesMap({...datesMap, [selectedInvoice.id]: e.target.value})}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="glass-card p-4 mb-6">
+                            <h4 className="text-xs font-bold uppercase tracking-wider text-secondary mb-3">Invoice Description</h4>
+                            <textarea 
+                                className="w-full bg-transparent border border-card-border rounded p-3 text-sm focus:border-primary min-h-[80px]"
+                                value={descriptionsMap[selectedInvoice.id] || selectedInvoice.invoice_data?.description || `consultation and development services for the month of ${selectedInvoice.month} ${selectedInvoice.year}`}
+                                onChange={e => setDescriptionsMap({...descriptionsMap, [selectedInvoice.id]: e.target.value})}
+                                placeholder="Enter invoice description..."
+                            />
                         </div>
 
                         <div className={`grid ${isFixedModal ? 'grid-cols-1 max-w-sm mx-auto' : 'grid-cols-2'} gap-8 mb-8`}>
@@ -499,24 +583,20 @@ export default function AdminInvoicesPage() {
                                 <div className="flex flex-col gap-2">
                                     {!isFixedModal && (
                                         <div className="flex justify-between">
-                                            <span className="text-sm">Total Approved Hours:</span>
-                                            <span className="font-bold">{selectedInvoice.invoice_data?.totalHours?.toFixed(2) || '0.00'}</span>
+                                            <span className="text-sm">Total {isUnitModal ? 'Units' : 'Hours'}:</span>
+                                            <span className="font-bold">{isUnitModal ? (selectedInvoice.invoice_data?.totalUnits || 0) : (selectedInvoice.invoice_data?.totalHours?.toFixed(2) || '0.00')}</span>
                                         </div>
                                     )}
                                     <div className="flex justify-between items-center">
                                         <span className="text-sm">{isFixedModal ? 'Monthly Salary:' : 'Hourly Rate:'}</span>
                                         <div className="flex items-center gap-1">
-                                            {selectedInvoice.status === 'pending' ? (
-                                                <input
-                                                    type="number"
-                                                    value={selectedInvoice.invoice_data?.hourlyRate || ''}
-                                                    onChange={e => handleRateChange(e.target.value)}
-                                                    className="bg-transparent border border-card-border rounded px-2 py-0.5 text-sm w-24 focus:border-primary text-right font-bold"
-                                                />
-                                            ) : (
-                                                <span className="font-bold">{selectedInvoice.invoice_data?.hourlyRate?.toLocaleString() || '0'}</span>
-                                            )}
-                                            <span className="text-secondary text-xs">/ {isFixedModal ? 'month' : (selectedInvoice.invoice_data?.paymentUnit || 'hour')}</span>
+                                            <input
+                                                type="number"
+                                                value={ratesMap[selectedInvoice.id] || selectedInvoice.invoice_data?.activeRate || selectedInvoice.invoice_data?.hourlyRate || ''}
+                                                onChange={e => setRatesMap({...ratesMap, [selectedInvoice.id]: e.target.value})}
+                                                className="bg-transparent border border-card-border rounded px-2 py-0.5 text-sm w-24 focus:border-primary text-right font-bold"
+                                            />
+                                            <span className="text-secondary text-xs">/ {basis === 'monthly' ? 'month' : (basis === 'unit' ? 'unit' : 'hour')}</span>
                                         </div>
                                     </div>
                                     <div className="flex justify-between pt-2 border-t border-card-border mt-2">

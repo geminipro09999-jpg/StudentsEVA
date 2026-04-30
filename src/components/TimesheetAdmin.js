@@ -12,6 +12,7 @@ const STATUS_MAP = {
 export default function TimesheetAdmin({ entries, lecturers }) {
     const [filterLecturer, setFilterLecturer] = useState('');
     const [filterStatus, setFilterStatus] = useState('pending');
+    const [filterType, setFilterType] = useState('all');
     const [selected, setSelected] = useState(new Set());
     const [adminNote, setAdminNote] = useState('');
     const [loading, setLoading] = useState(false);
@@ -124,9 +125,17 @@ export default function TimesheetAdmin({ entries, lecturers }) {
         return (localEntries || []).filter(e => {
             if (filterLecturer && e.lecturer_id !== filterLecturer) return false;
             if (filterStatus && e.status !== filterStatus) return false;
+            
+            if (filterType !== 'all') {
+                const methods = e.users?.payment_methods || [];
+                const isHourly = methods.includes('hourly');
+                const isUnit = methods.includes('unit');
+                if (filterType === 'hourly' && !isHourly) return false;
+                if (filterType === 'unit' && !isUnit) return false;
+            }
             return true;
         });
-    }, [localEntries, filterLecturer, filterStatus]);
+    }, [localEntries, filterLecturer, filterStatus, filterType]);
 
     function toggleAll() {
         if (selected.size === filtered.length) {
@@ -203,9 +212,17 @@ export default function TimesheetAdmin({ entries, lecturers }) {
                         </select>
                     </div>
                     <div>
+                        <label className="block text-xs font-bold text-secondary mb-2 uppercase tracking-wider">Payment Type</label>
+                        <select value={filterType} onChange={e => setFilterType(e.target.value)} className="w-full">
+                            <option value="all">All Types</option>
+                            <option value="hourly">Hourly Basis</option>
+                            <option value="unit">Per Day Basis</option>
+                        </select>
+                    </div>
+                    <div>
                         <label className="block text-xs font-bold text-secondary mb-2 uppercase tracking-wider">Status</label>
                         <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="w-full">
-                            <option value="">All</option>
+                            <option value="">All Status</option>
                             <option value="pending">Pending</option>
                             <option value="approved">Approved</option>
                             <option value="rejected">Rejected</option>
@@ -262,7 +279,7 @@ export default function TimesheetAdmin({ entries, lecturers }) {
                                     <th className="w-10 text-center">
                                         <input type="checkbox" checked={selected.size === filtered.length && filtered.length > 0} onChange={toggleAll} />
                                     </th>
-                                    {['Lecturer', 'Date', 'In', 'Out', 'Hours', 'Status', 'Note'].map(h => (
+                                    {['Lecturer', 'Type', 'Date', 'In', 'Out', 'Hours', 'Status', 'Note'].map(h => (
                                         <th key={h}>{h}</th>
                                     ))}
                                 </tr>
@@ -272,10 +289,17 @@ export default function TimesheetAdmin({ entries, lecturers }) {
                                     const s = STATUS_MAP[e.status] || STATUS_MAP.pending;
                                     return (
                                         <tr key={e.id}>
-                                            <td className="text-center">
-                                                <input type="checkbox" checked={selected.has(e.id)} onChange={() => toggle(e.id)} />
+                                            <td className="font-bold text-primary">
+                                                {e.users?.name || lecturerMap[e.lecturer_id] || 'Unknown'}
                                             </td>
-                                            <td className="font-bold text-primary">{e.users?.name || lecturerMap[e.lecturer_id] || 'Unknown'}</td>
+                                            <td>
+                                                {(() => {
+                                                    const methods = e.users?.payment_methods || [];
+                                                    if (methods.includes('unit')) return <span className="badge badge-accent text-[10px]">PER DAY</span>;
+                                                    if (methods.includes('hourly')) return <span className="badge badge-warning text-[10px]">LECTURER *</span>;
+                                                    return <span className="badge badge-secondary text-[10px]">OTHER</span>;
+                                                })()}
+                                            </td>
                                             <td className="whitespace-nowrap">
                                                 {isEditMode && e.status === 'pending' ? (
                                                     <input

@@ -16,7 +16,7 @@ export async function getUsers() {
 
         const { data, error } = await supabase
             .from('users')
-            .select('id, name, email, role, roles, created_at, hourly_rate, payment_unit, monthly_salary')
+            .select('id, name, email, role, roles, created_at, hourly_rate, payment_unit, unit_rate, monthly_salary, payment_methods')
             .order('name');
 
         if (error) {
@@ -81,8 +81,9 @@ export async function updateUserRoles(userId, roles, paymentInfo = {}) {
             roles: roles,
             role: roles[0],
             hourly_rate: paymentInfo.hourly_rate,
-            payment_unit: paymentInfo.payment_unit,
-            monthly_salary: paymentInfo.monthly_salary
+            unit_rate: paymentInfo.unit_rate,
+            monthly_salary: paymentInfo.monthly_salary,
+            payment_methods: paymentInfo.payment_methods
         };
 
         const { error } = await supabase
@@ -95,7 +96,8 @@ export async function updateUserRoles(userId, roles, paymentInfo = {}) {
             const fallbackData = {
                 role: roles[0],
                 hourly_rate: paymentInfo.hourly_rate,
-                payment_unit: paymentInfo.payment_unit
+                unit_rate: paymentInfo.unit_rate,
+                payment_methods: paymentInfo.payment_methods
             };
             const { error: fallbackError } = await supabase
                 .from('users')

@@ -46,7 +46,7 @@ export default function Navbar() {
                             <Link href="/quiz-import" className={`nav-link ${pathname === '/quiz-import' ? 'active' : ''}`}>Quiz Import</Link>
                         </>
                     )}
-                    {(roles.includes('lecturer') || session.user.role === 'lecturer') && (
+                    {(roles.includes('lecturer') || roles.includes('lecturer_hourly') || session.user.role === 'lecturer') && (
                         <>
                             {!isPureStaff && (
                                 <Link href="/feedback/add" className={`nav-link ${pathname === '/feedback/add' ? 'active' : ''}`}>Add Feedback</Link>
@@ -83,7 +83,7 @@ export default function Navbar() {
                         <div className="flex gap-1">
                             {roles.map((r, i) => (
                                 <span key={i} className={`badge ${['admin', 'administrator'].includes(r) ? 'badge-admin' : 'badge-lecturer'}`} style={{ fontSize: '0.6rem' }}>
-                                    {r.toUpperCase().replace('_', ' ')}
+                                    {r === 'lecturer_hourly' ? 'LECTURER *' : r.toUpperCase().replace('_', ' ')}
                                 </span>
                             ))}
                         </div>
@@ -156,19 +156,19 @@ export default function Navbar() {
                             </>
                         ) : (
                             <>
-                                {(roles.includes('lecturer') || session.user.role === 'lecturer') && (
+                                {(roles.includes('lecturer') || roles.includes('lecturer_hourly') || session.user.role === 'lecturer') && (
                                     <Link href="/feedback/add" className={`bottom-nav-item ${pathname === '/feedback/add' ? 'active' : ''}`}>
                                         <span className="icon">📝</span>
                                         <span>Feedback</span>
                                     </Link>
                                 )}
-                                {(roles.includes('lecturer') || session.user.role === 'lecturer') && (
+                                {(roles.includes('lecturer') || roles.includes('lecturer_hourly') || session.user.role === 'lecturer') && (
                                     <Link href="/timesheet" className={`bottom-nav-item ${pathname === '/timesheet' ? 'active' : ''}`}>
                                         <span className="icon">⏱️</span>
                                         <span>Times</span>
                                     </Link>
                                 )}
-                                {(roles.includes('lecturer') || session.user.role === 'lecturer') && (
+                                {(roles.includes('lecturer') || roles.includes('lecturer_hourly') || session.user.role === 'lecturer') && (
                                     <Link href="/vivas" className={`bottom-nav-item ${pathname.includes('/vivas') || pathname.includes('/viva-scoring') ? 'active' : ''}`}>
                                         <span className="icon">🎤</span>
                                         <span>Vivas</span>

@@ -80,7 +80,11 @@ export default function AddUserPage() {
                         <div className="flex flex-wrap gap-4 p-3 rounded" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--card-border)' }}>
                             <label className="flex items-center gap-2 cursor-pointer">
                                 <input type="checkbox" name="roles" value="lecturer" checked={selectedRoles.includes('lecturer')} onChange={handleRoleChange} />
-                                <span className="text-sm">Lecturer</span>
+                                <span className="text-sm">Lecturer (Per Day)</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" name="roles" value="lecturer_hourly" checked={selectedRoles.includes('lecturer_hourly')} onChange={handleRoleChange} />
+                                <span className="text-sm">Lecturer* (Hourly)</span>
                             </label>
                             <label className="flex items-center gap-2 cursor-pointer">
                                 <input type="checkbox" name="roles" value="admin" checked={selectedRoles.includes('admin')} onChange={handleRoleChange} />
@@ -88,13 +92,51 @@ export default function AddUserPage() {
                             </label>
                             <label className="flex items-center gap-2 cursor-pointer">
                                 <input type="checkbox" name="roles" value="incubator_staff" checked={selectedRoles.includes('incubator_staff')} onChange={handleRoleChange} />
-                                <span className="text-sm">Incubator Staff</span>
+                                <span className="text-sm">Incubator Staff (Monthly)</span>
                             </label>
                         </div>
                     </div>
 
+                    <div className="flex flex-col gap-4 mt-2">
+                        <label>Payment Methods</label>
+                        <div className="flex flex-col gap-3 p-4 rounded bg-white/5 border border-card-border">
+                            {/* Hourly */}
+                            <div className="flex flex-col gap-2">
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" name="payment_methods" value="hourly" defaultChecked={selectedRoles.includes('lecturer')} />
+                                    <span className="text-sm font-semibold">Enable Hourly Payment</span>
+                                </label>
+                                <div className="pl-6 text-xs text-secondary mb-1">
+                                    <label className="block mb-1">Hourly Rate (LKR)</label>
+                                    <input type="number" name="hourly_rate" defaultValue="3000" className="w-full" />
+                                </div>
+                            </div>
 
+                            {/* Unit */}
+                            <div className="flex flex-col gap-2">
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" name="payment_methods" value="unit" />
+                                    <span className="text-sm font-semibold">Enable Unit Payment</span>
+                                </label>
+                                <div className="pl-6 text-xs text-secondary mb-1">
+                                    <label className="block mb-1">Unit Rate (LKR)</label>
+                                    <input type="number" name="unit_rate" defaultValue="0" className="w-full" />
+                                </div>
+                            </div>
 
+                            {/* Monthly */}
+                            <div className="flex flex-col gap-2">
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" name="payment_methods" value="monthly" defaultChecked={selectedRoles.includes('incubator_staff')} />
+                                    <span className="text-sm font-semibold">Enable Fixed Monthly Salary</span>
+                                </label>
+                                <div className="pl-6 text-xs text-secondary mb-1">
+                                    <label className="block mb-1">Monthly Salary (LKR)</label>
+                                    <input type="number" name="monthly_salary" defaultValue="0" className="w-full" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                     <button type="submit" disabled={loading} className="btn btn-primary mt-2" style={{ padding: '1rem' }}>
                         {loading ? "Creating..." : "Create User"}
                     </button>

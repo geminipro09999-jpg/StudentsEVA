@@ -22,6 +22,7 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
     const [submissionLoading, setSubmissionLoading] = useState(false);
     const [isSubmitted, setIsSubmitted] = useState(false);
     const [invoiceType, setInvoiceType] = useState('timesheet');
+    const [paymentBasis, setPaymentBasis] = useState('hourly');
 
 
     const lecturerMap = useMemo(() => {
@@ -39,7 +40,7 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
     const monthName = MONTH_NAMES[Number(selectedMonth)] || '';
     const periodLabel = `${monthName} ${selectedYear}`;
     const dbInvoiceNo = `INV-${selectedYear}${String(selectedMonth).padStart(2, '0')}-${(selectedLecturer || '').slice(0, 6).toUpperCase()}`;
-    const displayInvoiceNo = `00 ${String(selectedMonth).padStart(2, '0')}`;
+    const displayInvoiceNo = String(selectedMonth).padStart(4, '0');
 
     const existingInvoice = useMemo(() => {
         return invoices.find(inv =>
@@ -49,26 +50,25 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
         );
     }, [invoices, monthName, selectedYear, selectedLecturer, initialIsAdmin]);
 
-    // Auto-set default type based on role when lecturer changes
+    // Auto-set default basis based on user settings when lecturer changes
     useEffect(() => {
-        if (!existingInvoice && !isSubmitted) {
-            if (!isLecturerRole && isStaffRole) setInvoiceType('fixed');
-            else if (!isStaffRole && isLecturerRole) setInvoiceType('timesheet');
+        if (!existingInvoice && !isSubmitted && lecturerInfo) {
+            const methods = lecturerInfo.payment_methods || [];
+            if (methods.length > 0) {
+                setPaymentBasis(methods[0]);
+            } else {
+                if (isStaffRole) setPaymentBasis('monthly');
+                else if (userRoles.includes('lecturer')) setPaymentBasis('unit');
+                else if (userRoles.includes('lecturer_hourly')) setPaymentBasis('hourly');
+                else setPaymentBasis('unit');
+            }
+        } else if (existingInvoice) {
+            setPaymentBasis(existingInvoice.invoice_data?.paymentBasis || 'hourly');
         }
-    }, [selectedLecturer, isLecturerRole, isStaffRole, existingInvoice, isSubmitted]);
+    }, [selectedLecturer, lecturerInfo, existingInvoice, isSubmitted, isStaffRole, JSON.stringify(userRoles)]);
 
-    // Prioritize snapshot values from the existing invoice if they exist
-    const activeInvoiceType = existingInvoice?.invoice_data?.invoiceType || invoiceType;
-    const isFixedInvoice = activeInvoiceType === 'fixed';
-
-    const activeRate = existingInvoice?.invoice_data?.hourlyRate ||
-        Number(manualRate) ||
-        (isFixedInvoice ? (lecturerInfo?.monthly_salary || 0) : (lecturerInfo?.hourly_rate || 3000));
-
-    const currentUnit = existingInvoice?.invoice_data?.paymentUnit || (isFixedInvoice ? 'month' : (lecturerInfo?.payment_unit || 'hour'));
-
-    const defaultDescription = `consultation and development services for the month of ${periodLabel}`;
-    const activeDescription = existingInvoice?.invoice_data?.description || invoiceDescription || defaultDescription;
+    const activeBasis = existingInvoice?.invoice_data?.paymentBasis || paymentBasis;
+    const isFixedInvoice = activeBasis === 'monthly';
 
     const rawFilteredEntries = useMemo(() => {
         return (entries || []).filter(e => {
@@ -87,7 +87,33 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
     const filteredEntries = existingInvoice?.invoice_data?.items || rawFilteredEntries;
     const totalHours = filteredEntries.reduce((s, e) => s + Number(e.hours), 0);
 
-    const calculatedGross = isFixedInvoice ? activeRate : (totalHours * activeRate);
+    const totalUnits = useMemo(() => {
+        if (activeBasis === 'hourly') return totalHours;
+        if (activeBasis === 'unit') {
+            const uniqueDates = [...new Set(rawFilteredEntries.map(e => e.work_date))];
+            return uniqueDates.length;
+        }
+        return 1;
+    }, [activeBasis, totalHours, rawFilteredEntries]);
+
+    const activeRate = existingInvoice?.invoice_data?.activeRate ||
+        Number(manualRate) ||
+        (activeBasis === 'monthly' ? (lecturerInfo?.monthly_salary || 0) : 
+         activeBasis === 'unit' ? (lecturerInfo?.unit_rate || 0) :
+         (lecturerInfo?.hourly_rate || 3000));
+
+    const unitLabel = activeBasis === 'hourly' ? 'Hrs' : 
+                     activeBasis === 'unit' ? 'Units' : 
+                     'Month';
+    
+    const displayUnit = activeBasis === 'monthly' ? '1' : 
+                       activeBasis === 'hourly' ? totalHours.toFixed(2) : 
+                       totalUnits.toString();
+
+    const defaultDescription = `consultation and development services for the month of ${periodLabel}`;
+    const activeDescription = existingInvoice?.invoice_data?.description || invoiceDescription || defaultDescription;
+
+    const calculatedGross = activeBasis === 'monthly' ? activeRate : (totalUnits * activeRate);
 
     const availableYears = useMemo(() => {
         const years = [...new Set((entries || []).map(e => e.work_date ? Number(e.work_date.split('-')[0]) : null).filter(Boolean))].sort((a, b) => b - a);
@@ -129,13 +155,14 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
             year: selectedYear,
             amount: freshFinalTotal,
             deductions: freshDeduction,
-            hourlyRate: freshRate,
-            paymentUnit: freshPaymentUnit,
-            totalHours: freshTotalHours,
+            activeRate: freshRate,
+            paymentBasis: paymentBasis,
+            totalUnits: activeBasis === 'monthly' ? 1 : totalUnits,
+            unitLabel: unitLabel,
             items: rawFilteredEntries,
             lecturerName: lecturerInfo?.name,
             lecturerEmail: lecturerInfo?.staff_email || lecturerInfo?.email,
-            invoiceType: freshInvoiceType,
+            invoiceType: activeBasis === 'monthly' ? 'fixed' : 'timesheet',
             description: activeDescription
         });
 
@@ -211,19 +238,19 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
                 'unicomtic@gmail.com'
             ], 20, 102);
 
-            const headSummary = isFixedInvoice
-                ? [['Description', 'Total - LKR']]
-                : [['Quantity', 'Description', 'Unit Price', 'Total - LKR']];
-
-            const bodySummary = [isFixedInvoice
-                ? [activeDescription, grossTotal.toLocaleString()]
-                : [
-                    `${totalHours.toFixed(2)} ${currentUnit === 'hour' ? 'Hrs' : 'Units'}`,
+            const isMonthly = activeBasis === 'monthly';
+            const headSummary = isMonthly 
+                ? [['Description', 'Total - LKR']] 
+                : [['Description', 'Unit', 'Rate per Unit', 'Total - LKR']];
+            
+            const bodySummary = isMonthly
+                ? [[activeDescription, grossTotal.toLocaleString()]]
+                : [[
                     activeDescription,
+                    `${displayUnit} ${unitLabel}`,
                     activeRate.toLocaleString(),
                     grossTotal.toLocaleString()
-                ]
-            ];
+                  ]];
 
             autoTable(doc, {
                 startY: 125,
@@ -232,9 +259,9 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
                 theme: 'grid',
                 headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: 'bold', lineWidth: 0.5, lineColor: [0, 0, 0] },
                 bodyStyles: { textColor: [0, 0, 0], lineWidth: 0.1, lineColor: [200, 200, 200] },
-                columnStyles: isFixedInvoice
+                columnStyles: isMonthly 
                     ? { 0: { cellWidth: 'auto' }, 1: { cellWidth: 40, halign: 'right' } }
-                    : { 0: { cellWidth: 25 }, 1: { cellWidth: 'auto' }, 2: { cellWidth: 35, halign: 'right' }, 3: { cellWidth: 35, halign: 'right' } }
+                    : { 0: { cellWidth: 'auto' }, 1: { cellWidth: 30, halign: 'center' }, 2: { cellWidth: 35, halign: 'right' }, 3: { cellWidth: 35, halign: 'right' } }
             });
 
             const finalY = doc.lastAutoTable.finalY + 15;
@@ -271,15 +298,16 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
             }
 
             // 9. Signatures
+            doc.setFontSize(12);
+            doc.setFont('helvetica', 'bold');
             doc.setTextColor(0, 0, 0);
-            doc.setFontSize(10);
-            doc.text('Signature', 20, finalY + 45);
-
+            doc.text('Signature', 140, doc.internal.pageSize.height - 40);
+            
             if (lecturerInfo?.e_signature) {
                 try {
-                    doc.addImage(lecturerInfo.e_signature, 'PNG', 20, finalY + 50, 40, 15);
+                    doc.addImage(lecturerInfo.e_signature, 'PNG', 140, doc.internal.pageSize.height - 35, 40, 20);
                 } catch (e) {
-                    console.error("Signature Render Error:", e);
+                    console.error("Signature image error", e);
                 }
             }
 
@@ -312,12 +340,12 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
                 right: { style: BorderStyle.SINGLE, size: 1 },
             };
 
-            const tableRows = !isFixedInvoice ? [
+            const tableRows = [
                 new TableRow({
                     tableHeader: true,
-                    children: ['Quantity', 'Description', 'Unit Price', 'Total - LKR'].map(h =>
+                    children: ['Description', 'Unit', 'Rate per Unit', 'Total - LKR'].map(h =>
                         new TableCell({
-                            children: [new Paragraph({ children: [new TextRun({ text: h, bold: true, size: 20, color: 'FFFFFF' })], alignment: h === 'Description' || h === 'Quantity' ? AlignmentType.LEFT : AlignmentType.RIGHT })],
+                            children: [new Paragraph({ children: [new TextRun({ text: h, bold: true, size: 20, color: 'FFFFFF' })], alignment: h === 'Description' ? AlignmentType.LEFT : (h === 'Unit' ? AlignmentType.CENTER : AlignmentType.RIGHT) })],
                             shading: { fill: '6366F1' },
                             borders: headerBorder,
                         })
@@ -325,39 +353,16 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
                 }),
                 new TableRow({
                     children: [
-                        `${totalHours.toFixed(2)} ${currentUnit === 'hour' ? 'Hrs' : 'Units'}`,
                         activeDescription,
+                        `${displayUnit} ${unitLabel}`,
                         activeRate.toLocaleString(),
                         grossTotal.toLocaleString(),
                     ].map((val, ci) =>
                         new TableCell({
-                            children: [new Paragraph({ children: [new TextRun({ text: val, size: 18 })], alignment: (ci === 2 || ci === 3) ? AlignmentType.RIGHT : AlignmentType.LEFT })],
+                            children: [new Paragraph({ children: [new TextRun({ text: val, size: 18 })], alignment: ci === 0 ? AlignmentType.LEFT : (ci === 1 ? AlignmentType.CENTER : AlignmentType.RIGHT) })],
                             borders: headerBorder,
                         })
                     ),
-                })
-            ] : [
-                new TableRow({
-                    tableHeader: true,
-                    children: ['Description', 'Total - LKR'].map(h =>
-                        new TableCell({
-                            children: [new Paragraph({ children: [new TextRun({ text: h, bold: true, size: 20, color: 'FFFFFF' })], alignment: h === 'Description' ? AlignmentType.LEFT : AlignmentType.RIGHT })],
-                            shading: { fill: '6366F1' },
-                            borders: headerBorder,
-                        })
-                    ),
-                }),
-                new TableRow({
-                    children: [
-                        new TableCell({
-                            children: [new Paragraph({ children: [new TextRun({ text: activeDescription, size: 18 })] })],
-                            borders: headerBorder,
-                        }),
-                        new TableCell({
-                            children: [new Paragraph({ children: [new TextRun({ text: grossTotal.toLocaleString(), bold: true, size: 18 })], alignment: AlignmentType.RIGHT })],
-                            borders: headerBorder,
-                        }),
-                    ],
                 })
             ];
 
@@ -494,23 +499,40 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
                             />
                         </div>
                     )}
-                    {(isLecturerRole || isStaffRole) && (
+                    {lecturerInfo && (
                         <div>
-                            <label>Invoice Type</label>
-                            <select value={invoiceType} onChange={e => setInvoiceType(e.target.value)} style={{ width: '100%' }}>
-                                <option value="timesheet">Timesheet (Hourly/Unit)</option>
-                                <option value="fixed">Fixed Monthly Salary</option>
+                            <label>Payment Basis (Choose Type)</label>
+                            <select 
+                                value={paymentBasis} 
+                                onChange={e => setPaymentBasis(e.target.value)} 
+                                style={{ width: '100%' }}
+                            >
+                                {(lecturerInfo.payment_methods || []).map(m => (
+                                    <option key={m} value={m}>
+                                        {m === 'hourly' ? 'Hourly Payment' : 
+                                         m === 'unit' ? 'Per Day Payment' : 
+                                         'Fixed Monthly Salary'}
+                                    </option>
+                                ))}
+                                {/* Fallback for legacy data */}
+                                {(!lecturerInfo.payment_methods || lecturerInfo.payment_methods.length === 0) && (
+                                    <>
+                                        <option value="hourly">Hourly Payment</option>
+                                        <option value="unit">Per Day Payment</option>
+                                        <option value="monthly">Fixed Monthly Salary</option>
+                                    </>
+                                )}
                             </select>
                         </div>
                     )}
-                    {initialIsAdmin && !isFixedInvoice && (
+                    {initialIsAdmin && (
                         <div>
-                            <label>Rate per Hour (LKR) *</label>
+                            <label>Custom Rate (LKR) *</label>
                             <input
                                 type="number"
                                 value={manualRate}
                                 onChange={e => setManualRate(e.target.value)}
-                                placeholder={`Default: ${lecturerInfo?.hourly_rate || 3000}`}
+                                placeholder={`Default: ${activeRate}`}
                                 style={{ width: '100%' }}
                                 className="bg-transparent border border-card-border rounded px-2 py-1 focus:border-primary transition-colors"
                             />
@@ -596,18 +618,16 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
                         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                             <thead>
                                 <tr style={{ borderBottom: '1px solid black' }}>
-                                    {!isFixedInvoice && <th style={{ textAlign: 'left', padding: '8px' }}>Quantity</th>}
                                     <th style={{ textAlign: 'left', padding: '8px' }}>Description</th>
-                                    {!isFixedInvoice && <th style={{ textAlign: 'right', padding: '8px' }}>Unit Price</th>}
+                                    {!isFixedInvoice && <th style={{ textAlign: 'center', padding: '8px' }}>Unit</th>}
+                                    {!isFixedInvoice && <th style={{ textAlign: 'right', padding: '8px' }}>Rate per Unit</th>}
                                     <th style={{ textAlign: 'right', padding: '8px' }}>Total - LKR</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <tr>
-                                    {!isFixedInvoice && <td style={{ padding: '8px' }}>{totalHours.toFixed(2)} {currentUnit === 'hour' ? 'Hrs' : 'Units'}</td>}
-                                    <td style={{ padding: '8px' }}>
-                                        {activeDescription}
-                                    </td>
+                                    <td style={{ padding: '8px' }}>{activeDescription}</td>
+                                    {!isFixedInvoice && <td style={{ textAlign: 'center', padding: '8px' }}>{displayUnit} {unitLabel}</td>}
                                     {!isFixedInvoice && <td style={{ textAlign: 'right', padding: '8px' }}>{activeRate.toLocaleString()}</td>}
                                     <td style={{ textAlign: 'right', padding: '8px' }}>{grossTotal.toLocaleString()}</td>
                                 </tr>
