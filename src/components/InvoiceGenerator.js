@@ -39,7 +39,7 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
     const monthName = MONTH_NAMES[Number(selectedMonth)] || '';
     const periodLabel = `${monthName} ${selectedYear}`;
     const dbInvoiceNo = `INV-${selectedYear}${String(selectedMonth).padStart(2, '0')}-${(selectedLecturer || '').slice(0, 6).toUpperCase()}`;
-    const displayInvoiceNo = `INV-${String(selectedMonth).padStart(2, '0')}`;
+    const displayInvoiceNo = `00 ${String(selectedMonth).padStart(2, '0')}`;
 
     const existingInvoice = useMemo(() => {
         return invoices.find(inv =>
@@ -429,7 +429,7 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
                                     invoices.map(inv => (
                                         <tr key={inv.id}>
                                             <td className="font-semibold">{inv.month} {inv.year}</td>
-                                            <td className="text-xs font-mono">INV-{String(MONTH_NAMES.indexOf(inv.month)).padStart(2, '0')}</td>
+                                            <td className="text-xs font-mono">00 {String(MONTH_NAMES.indexOf(inv.month)).padStart(2, '0')}</td>
                                             <td className="font-bold">{(inv.amount || 0).toLocaleString()}</td>
                                             <td>
                                                 <span className={`badge ${inv.status === 'approved' ? 'badge-success' : 'badge-warning'}`}>

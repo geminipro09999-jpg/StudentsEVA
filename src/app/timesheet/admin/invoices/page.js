@@ -124,7 +124,7 @@ export default function AdminInvoicesPage() {
             doc.setFontSize(10);
             doc.text([
                 `Email: ${staff.staff_email || staff.email}`,
-                `Invoice No: INV-${String(inv.month_no || new Date(`${inv.month} 1, ${inv.year}`).getMonth() + 1).padStart(2, '0')}`,
+                `Invoice No: 00 ${String(inv.month_no || new Date(`${inv.month} 1, ${inv.year}`).getMonth() + 1).padStart(2, '0')}`,
                 `Date: 15/${String(inv.month_no || new Date(`${inv.month} 1, ${inv.year}`).getMonth() + 1).padStart(2, '0')}/${inv.year}`
             ], 20, 58);
 
@@ -216,7 +216,7 @@ export default function AdminInvoicesPage() {
                 const url = URL.createObjectURL(blob);
                 window.open(url, '_blank');
             } else {
-                const fileName = `${staff.name} ${inv.month} INV-${String(inv.month_no || new Date(`${inv.month} 1, ${inv.year}`).getMonth() + 1).padStart(2, '0')}.pdf`;
+                const fileName = `${staff.name} ${inv.month} 00 ${String(inv.month_no || new Date(`${inv.month} 1, ${inv.year}`).getMonth() + 1).padStart(2, '0')}.pdf`;
                 doc.save(fileName);
                 toast.success("Final PDF generated!");
             }
@@ -357,7 +357,7 @@ export default function AdminInvoicesPage() {
                                             <div className="text-xs text-secondary">{inv.users?.staff_email || inv.users?.email}</div>
                                         </td>
                                         <td>{inv.month} {inv.year}</td>
-                                        <td className="text-xs font-mono">INV-{String(inv.month_no || new Date(`${inv.month} 1, ${inv.year}`).getMonth() + 1).padStart(2, '0')}</td>
+                                        <td className="text-xs font-mono">00 {String(inv.month_no || new Date(`${inv.month} 1, ${inv.year}`).getMonth() + 1).padStart(2, '0')}</td>
                                         <td>
                                             <input
                                                 type="number"
