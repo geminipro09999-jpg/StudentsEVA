@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { getAllScoresForViva } from "@/app/actions/scoringActions";
 import jsPDF from "jspdf";
-import "jspdf-autotable";
+import autoTable from "jspdf-autotable";
 
 export default function ReportDirectory({ feedbacks, vivas = [], quizzes = [], allSubjects = [], allLabs = [] }) {
     const [activeTab, setActiveTab] = useState("feedbacks");
@@ -112,7 +112,7 @@ export default function ReportDirectory({ feedbacks, vivas = [], quizzes = [], a
                 g.remark || "-"
             ]);
 
-            doc.autoTable({
+            autoTable(doc, {
                 startY: 55,
                 head: [tableColumn],
                 body: tableRows,

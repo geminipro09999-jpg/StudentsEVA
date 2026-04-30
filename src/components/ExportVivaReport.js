@@ -1,7 +1,7 @@
 "use client";
 
 import jsPDF from "jspdf";
-import "jspdf-autotable";
+import autoTable from "jspdf-autotable";
 
 export default function ExportVivaReport({ viva, groupedScores }) {
     const handleExport = () => {
@@ -48,7 +48,7 @@ export default function ExportVivaReport({ viva, groupedScores }) {
             ]);
         });
 
-        doc.autoTable({
+        autoTable(doc, {
             startY: 70,
             head: [tableColumn],
             body: tableRows,
