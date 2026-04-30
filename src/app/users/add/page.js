@@ -21,8 +21,7 @@ export default function AddUserPage() {
         }
     };
 
-    const isTimesheetUser = selectedRoles.includes('lecturer');
-    const isMonthlyUser = selectedRoles.includes('incubator_staff') || selectedRoles.includes('lecturer');
+
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -94,31 +93,7 @@ export default function AddUserPage() {
                         </div>
                     </div>
 
-                    {(isTimesheetUser || isMonthlyUser) && (
-                        <div className="flex flex-col gap-4 animate-fade-in">
-                            {isTimesheetUser && (
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label>Payment Rate (p/hr or unit)</label>
-                                        <input type="number" name="hourly_rate" defaultValue="3000" required />
-                                    </div>
-                                    <div>
-                                        <label>Payment Unit</label>
-                                        <select name="payment_unit" defaultValue="hour" className="w-full">
-                                            <option value="hour">Per Hour</option>
-                                            <option value="unit">Per Unit</option>
-                                        </select>
-                                    </div>
-                                </div>
-                            )}
-                            {isMonthlyUser && (
-                                <div>
-                                    <label>Fixed Monthly Salary (LKR)</label>
-                                    <input type="number" name="monthly_salary" defaultValue="0" placeholder="e.g. 50000" required />
-                                </div>
-                            )}
-                        </div>
-                    )}
+
 
                     <button type="submit" disabled={loading} className="btn btn-primary mt-2" style={{ padding: '1rem' }}>
                         {loading ? "Creating..." : "Create User"}

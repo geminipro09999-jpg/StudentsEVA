@@ -7,9 +7,6 @@ import toast from "react-hot-toast";
 export default function EditRolesModal({ user, onClose }) {
     const initialRoles = (user.roles || [user.role]).map(r => r === 'administrator' ? 'admin' : r);
     const [selectedRoles, setSelectedRoles] = useState(initialRoles);
-    const [hourlyRate, setHourlyRate] = useState(user.hourly_rate || 3000);
-    const [paymentUnit, setPaymentUnit] = useState(user.payment_unit || 'hour');
-    const [monthlySalary, setMonthlySalary] = useState(user.monthly_salary || 0);
     const [loading, setLoading] = useState(false);
 
     const toggleRole = (role) => {
@@ -27,11 +24,7 @@ export default function EditRolesModal({ user, onClose }) {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
-        const res = await updateUserRoles(user.id, selectedRoles, {
-            hourly_rate: hourlyRate,
-            payment_unit: paymentUnit,
-            monthly_salary: monthlySalary
-        });
+        const res = await updateUserRoles(user.id, selectedRoles);
         if (res.success) {
             toast.success("Roles updated successfully");
             onClose();
@@ -83,42 +76,6 @@ export default function EditRolesModal({ user, onClose }) {
                                 </label>
                             );
                         })}
-                    </div>
-
-                    <div className="border-t border-card-border pt-4 mb-6">
-                        <h4 className="text-sm font-bold mb-3 uppercase tracking-wider text-secondary">Payment Information</h4>
-                        <div className="grid grid-cols-2 gap-3 mb-3">
-                            <div>
-                                <label className="text-xs text-secondary mb-1 block">Hourly/Unit Rate</label>
-                                <input
-                                    type="number"
-                                    value={hourlyRate}
-                                    onChange={(e) => setHourlyRate(e.target.value)}
-                                    className="w-full text-sm"
-                                />
-                            </div>
-                            <div>
-                                <label className="text-xs text-secondary mb-1 block">Unit</label>
-                                <select
-                                    value={paymentUnit}
-                                    onChange={(e) => setPaymentUnit(e.target.value)}
-                                    className="w-full text-sm"
-                                >
-                                    <option value="hour">Hour</option>
-                                    <option value="unit">Unit</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div>
-                            <label className="text-xs text-secondary mb-1 block">Fixed Monthly Salary</label>
-                            <input
-                                type="number"
-                                value={monthlySalary}
-                                onChange={(e) => setMonthlySalary(e.target.value)}
-                                className="w-full text-sm"
-                                placeholder="0.00"
-                            />
-                        </div>
                     </div>
 
                     <div className="flex justify-end gap-3 pt-4 border-t border-card-border">
