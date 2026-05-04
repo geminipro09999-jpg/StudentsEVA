@@ -1,13 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { getAllScoresForViva } from "@/app/actions/scoringActions";
 import { getVivaDetails } from "@/app/actions/vivaActions";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import ExportVivaReport from "@/components/ExportVivaReport";
 
-export default function ReportDirectory({ feedbacks, vivas = [], quizzes = [], allSubjects = [], allLabs = [] }) {
+export default function ReportDirectory({ feedbacks, vivas = [], vivaScores = [], quizzes = [], allSubjects = [], allLabs = [] }) {
     const [activeTab, setActiveTab] = useState("feedbacks");
     const [utQuery, setUtQuery] = useState("");
     const [groupFilter, setGroupFilter] = useState("");
@@ -17,6 +18,141 @@ export default function ReportDirectory({ feedbacks, vivas = [], quizzes = [], a
     const [ratingFilter, setRatingFilter] = useState("");
     const [quizNameFilter, setQuizNameFilter] = useState("");
     const [exporting, setExporting] = useState(false);
+    
+    // Autocomplete state
+    const [showSuggestions, setShowSuggestions] = useState(false);
+
+    // Pagination state
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(30);
+    
+    // Viva Ledger State
+    const [selectedVivaId, setSelectedVivaId] = useState("");
+    const [selectedVivaDetails, setSelectedVivaDetails] = useState(null);
+    const [selectedVivaGroupedScores, setSelectedVivaGroupedScores] = useState([]);
+    const [isLoadingViva, setIsLoadingViva] = useState(false);
+
+    // Extract unique students for autocomplete
+    const uniqueStudents = useMemo(() => {
+        const map = new Map();
+        feedbacks.forEach(f => {
+            if (f.student?.student_id) map.set(f.student.student_id, f.student.name);
+        });
+        vivaScores.forEach(v => {
+            if (v.students?.student_id) map.set(v.students.student_id, v.students.name);
+        });
+        quizzes.forEach(q => {
+            if (q.students?.student_id) map.set(q.students.student_id, q.students.name);
+        });
+        return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+    }, [feedbacks, vivaScores, quizzes]);
+
+    const searchSuggestions = useMemo(() => {
+        if (!utQuery || utQuery.length < 1) return [];
+        const query = utQuery.toLowerCase();
+        return uniqueStudents.filter(s => 
+            s.id.toLowerCase().includes(query) || 
+            (s.name && s.name.toLowerCase().includes(query))
+        ).slice(0, 8); // Max 8 suggestions
+    }, [utQuery, uniqueStudents]);
+
+    // Reset pagination on filter or tab change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [activeTab, utQuery, groupFilter, labFilter, subjectFilter, lecturerFilter, ratingFilter, quizNameFilter, itemsPerPage, selectedVivaId]);
+
+    // Fetch and calculate Grouped Scores when a Viva is selected
+    useEffect(() => {
+        if (!selectedVivaId) {
+            setSelectedVivaDetails(null);
+            setSelectedVivaGroupedScores([]);
+            return;
+        }
+
+        async function fetchVivaLedger() {
+            setIsLoadingViva(true);
+            const [{ data: viva }, { data: scores }] = await Promise.all([
+                getVivaDetails(selectedVivaId),
+                getAllScoresForViva(selectedVivaId)
+            ]);
+
+            if (viva && scores) {
+                const vivaTotal = viva.criteria.reduce((s, c) => s + c.max_marks, 0);
+                const panelistWeights = viva.panelists?.reduce((acc, p) => {
+                    acc[p.user_id] = p.weight;
+                    return acc;
+                }, {}) || {};
+
+                const groupedScoresMap = scores.reduce((acc, score) => {
+                    const studentId = score.student_id;
+                    const lecturerId = score.lecturer_id;
+                    
+                    if (!acc[studentId]) {
+                        acc[studentId] = {
+                            student: score.students,
+                            panelistData: {},
+                            remark: score.remark,
+                            is_verified: score.is_verified,
+                            is_locked: score.is_locked,
+                            updated_at: score.updated_at,
+                            lecturerId: lecturerId
+                        };
+                    }
+
+                    if (!acc[studentId].panelistData[lecturerId]) {
+                        acc[studentId].panelistData[lecturerId] = {
+                            name: score.users.name,
+                            scores: {}
+                        };
+                    }
+
+                    acc[studentId].panelistData[lecturerId].scores[score.criteria_id] = score.score;
+                    
+                    if (new Date(score.updated_at) > new Date(acc[studentId].updated_at)) {
+                        acc[studentId].updated_at = score.updated_at;
+                    }
+
+                    if (score.is_locked) acc[studentId].is_locked = true;
+                    if (score.is_verified) acc[studentId].is_verified = true;
+                    if (score.remark && !acc[studentId].remark) acc[studentId].remark = score.remark;
+
+                    return acc;
+                }, {});
+
+                const groupedScores = Object.values(groupedScoresMap || {}).map(group => {
+                    const weightedCriteriaScores = {};
+                    let finalTotal = 0;
+
+                    viva.criteria.forEach(c => {
+                        let weightedScoreForMetric = 0;
+                        Object.entries(group.panelistData).forEach(([lId, data]) => {
+                            const score = data.scores[c.id];
+                            const weight = panelistWeights[lId] || 0;
+                            if (score !== undefined) {
+                                weightedScoreForMetric += (score * weight) / 100;
+                            }
+                        });
+                        weightedCriteriaScores[c.id] = parseFloat(weightedScoreForMetric.toFixed(2));
+                        finalTotal += weightedScoreForMetric;
+                    });
+
+                    return {
+                        ...group,
+                        criteriaScores: weightedCriteriaScores,
+                        total: parseFloat(finalTotal.toFixed(2)),
+                        max_total: vivaTotal,
+                        lecturerName: Object.values(group.panelistData).map(p => p.name).join(', ')
+                    };
+                });
+
+                setSelectedVivaDetails(viva);
+                setSelectedVivaGroupedScores(groupedScores);
+            }
+            setIsLoadingViva(false);
+        }
+        
+        fetchVivaLedger();
+    }, [selectedVivaId]);
 
     // Helpers
     const groups = Array.from(new Set(feedbacks.map(f => f.group_name).filter(g => g !== 'N/A')));
@@ -44,10 +180,24 @@ export default function ReportDirectory({ feedbacks, vivas = [], quizzes = [], a
         return matchesUt && matchesGroup && matchesLab && matchesSubject && matchesLecturer && matchesRating;
     });
 
-    // Viva Filtering
-    const filteredVivas = vivas.filter(v => 
-        v.name.toLowerCase().includes(utQuery.toLowerCase())
-    );
+    // Viva Ledger Filtering
+    const filteredVivaGroupedScores = selectedVivaGroupedScores.filter(g => {
+        const matchesUt = utQuery === "" || 
+            g.student?.student_id.toLowerCase().includes(utQuery.toLowerCase()) ||
+            g.student?.name.toLowerCase().includes(utQuery.toLowerCase());
+        const matchesGroup = groupFilter === "" || g.student?.group_name === groupFilter;
+        return matchesUt && matchesGroup;
+    });
+
+    // Viva Flat Scores Filtering (When no specific Viva is selected)
+    const filteredVivaFlatScores = vivaScores.filter(v => {
+        const matchesUt = utQuery === "" || 
+            v.students?.student_id.toLowerCase().includes(utQuery.toLowerCase()) ||
+            v.students?.name.toLowerCase().includes(utQuery.toLowerCase());
+        const matchesGroup = groupFilter === "" || v.students?.group_name === groupFilter;
+        const matchesViva = selectedVivaId === "" || v.viva_id === selectedVivaId;
+        return matchesUt && matchesGroup && matchesViva;
+    });
 
     // Quiz Filtering
     const filteredQuizzes = quizzes.filter(q => {
@@ -59,94 +209,78 @@ export default function ReportDirectory({ feedbacks, vivas = [], quizzes = [], a
         return matchesUt && matchesGroup && matchesQuizName;
     });
 
-    const handleExportViva = async (viva) => {
-        setExporting(viva.id);
-        const res = await getAllScoresForViva(viva.id);
-        if (res.data) {
-            // Calculate total potential marks for this viva
-            const { data: vivaMeta } = await getVivaDetails(viva.id);
-            const vivaTotal = vivaMeta?.criteria.reduce((s, c) => s + c.max_marks, 0) || 0;
+    // Pagination logic
+    const paginatedFeedbacks = filteredFeedbacks.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+    const paginatedVivaGroupedScores = filteredVivaGroupedScores.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+    const paginatedVivaFlatScores = filteredVivaFlatScores.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+    const paginatedQuizzes = filteredQuizzes.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
-            let grouped = res.data.reduce((acc, score) => {
-                const key = `${score.student_id}_${score.lecturer_id}`;
-                if (!acc[key]) {
-                    acc[key] = {
-                        student: score.students,
-                        lecturer: score.users,
-                        criteriaScores: {},
-                        remark: score.remark,
-                        total: 0,
-                        max_total: vivaTotal
-                    };
-                }
-                acc[key].criteriaScores[score.criteria_id] = score.score;
-                acc[key].total += score.score;
-                return acc;
-            }, {});
+    const renderPagination = (totalItems) => {
+        const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
+        if (totalItems === 0) return null;
 
-            // Filter by group if active
-            if (groupFilter) {
-                grouped = Object.fromEntries(
-                    Object.entries(grouped).filter(([_, g]) => g.student.group_name === groupFilter)
-                );
-            }
-
-            // Generate PDF
-            const doc = new jsPDF();
-            doc.setFontSize(20);
-            doc.text("Viva Evaluation Report", 14, 22);
-            if (groupFilter) {
-                doc.setFontSize(14);
-                doc.setTextColor(66, 133, 244);
-                doc.text(`Group: ${groupFilter}`, 14, 30);
-            }
-            
-            doc.setFontSize(12);
-            doc.setTextColor(0);
-            doc.text(`Event: ${viva.name}`, 14, 40);
-            doc.text(`Date: ${new Date(viva.viva_date).toLocaleDateString()}`, 14, 47);
-
-            // Extract unique criteria for this viva from the data
-            const criteriaMap = {};
-            res.data.forEach(s => {
-                if (!criteriaMap[s.viva_criteria.id]) {
-                    criteriaMap[s.viva_criteria.id] = s.viva_criteria.name;
-                }
-            });
-            const criteriaIds = Object.keys(criteriaMap);
-            const criteriaNames = Object.values(criteriaMap);
-
-            const tableColumn = ["Student", "UT Number", "Lecturer", ...criteriaNames, "Total", "Remark"];
-            const tableRows = Object.values(grouped).map(g => {
-                const row = [
-                    g.student.name,
-                    g.student.student_id,
-                    g.lecturer.name
-                ];
+        return (
+            <div className="flex flex-col sm:flex-row items-center justify-between mt-6 border-t border-card-border pt-4 gap-4">
+                <div className="flex items-center gap-4">
+                    <span className="text-xs text-secondary">
+                        Showing <span className="font-bold text-accent-color">{Math.min(((currentPage - 1) * itemsPerPage) + 1, totalItems)}</span> to <span className="font-bold text-accent-color">{Math.min(currentPage * itemsPerPage, totalItems)}</span> of <span className="font-bold text-accent-color">{totalItems}</span> entries
+                    </span>
+                    <div className="flex items-center gap-2">
+                        <label className="text-[10px] uppercase font-bold text-tertiary">Show</label>
+                        <select 
+                            value={itemsPerPage} 
+                            onChange={e => setItemsPerPage(Number(e.target.value))}
+                            className="text-xs bg-surface-container-high border border-card-border/50 rounded px-2 py-1 outline-none focus:border-accent-color/50 transition-colors"
+                        >
+                            <option value={10}>10</option>
+                            <option value={30}>30</option>
+                            <option value={50}>50</option>
+                            <option value={100}>100</option>
+                        </select>
+                    </div>
+                </div>
                 
-                // Individual criteria scores
-                criteriaIds.forEach(cid => {
-                    row.push(g.criteriaScores[cid] || 0);
-                });
+                {totalPages > 1 && (
+                    <div className="flex gap-2">
+                        <button 
+                            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                            disabled={currentPage === 1}
+                            className={`btn py-1 px-3 text-xs font-bold border border-card-border/50 ${currentPage === 1 ? 'opacity-50 cursor-not-allowed' : 'btn-secondary hover:bg-surface-container-high'}`}
+                        >
+                            Previous
+                        </button>
+                        
+                        <div className="flex gap-1">
+                            {Array.from({ length: totalPages }, (_, i) => i + 1)
+                                .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                                .map((page, idx, arr) => {
+                                    const showEllipsis = idx > 0 && page - arr[idx - 1] > 1;
+                                    return (
+                                        <div key={page} className="flex gap-1">
+                                            {showEllipsis && <span className="text-tertiary self-end px-1">...</span>}
+                                            <button 
+                                                onClick={() => setCurrentPage(page)}
+                                                className={`btn py-1 px-3 text-xs font-bold border transition-colors ${page === currentPage ? 'bg-accent-glow text-accent-color border-accent-color/50' : 'btn-secondary border-card-border/50 hover:bg-surface-container-high'}`}
+                                            >
+                                                {page}
+                                            </button>
+                                        </div>
+                                    );
+                                })
+                            }
+                        </div>
 
-                row.push(`${g.total} / ${g.max_total}`);
-                row.push(g.remark || "-");
-                return row;
-            });
-
-            autoTable(doc, {
-                startY: 55,
-                head: [tableColumn],
-                body: tableRows,
-                theme: 'grid',
-                headStyles: { fillColor: [66, 133, 244], fontSize: 8 },
-                styles: { fontSize: 7, cellPadding: 2 }
-            });
-
-            const groupSuffix = groupFilter ? `_${groupFilter}` : "";
-            doc.save(`Report_${viva.name}${groupSuffix}.pdf`);
-        }
-        setExporting(false);
+                        <button 
+                            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                            disabled={currentPage === totalPages}
+                            className={`btn py-1 px-3 text-xs font-bold border border-card-border/50 ${currentPage === totalPages ? 'opacity-50 cursor-not-allowed' : 'btn-secondary hover:bg-surface-container-high'}`}
+                        >
+                            Next
+                        </button>
+                    </div>
+                )}
+            </div>
+        );
     };
 
     return (
@@ -175,16 +309,39 @@ export default function ReportDirectory({ feedbacks, vivas = [], quizzes = [], a
 
             <div className="mb-6">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
-                    <div className="space-y-2">
+                    <div className="space-y-2 relative z-50">
                         <label className="text-xs font-bold text-secondary uppercase tracking-widest">
-                            {activeTab === "vivas" ? "Search Viva Name" : "UT Number Search"}
+                            UT Number Search
                         </label>
                         <input
                             type="text"
-                            placeholder={activeTab === "vivas" ? "Search event..." : "e.g. UT001"}
+                            placeholder="e.g. UT001 or Name"
                             value={utQuery}
-                            onChange={e => setUtQuery(e.target.value)}
+                            onChange={e => {
+                                setUtQuery(e.target.value);
+                                setShowSuggestions(true);
+                            }}
+                            onFocus={() => setShowSuggestions(true)}
+                            onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                            className="w-full"
                         />
+                        {showSuggestions && searchSuggestions.length > 0 && (
+                            <div className="absolute top-full left-0 right-0 mt-2 bg-card-bg border border-card-border/50 rounded-xl shadow-2xl overflow-hidden max-h-64 overflow-y-auto">
+                                {searchSuggestions.map(student => (
+                                    <div 
+                                        key={student.id}
+                                        className="px-4 py-3 hover:bg-accent/10 cursor-pointer flex flex-col sm:flex-row sm:justify-between sm:items-center border-b border-card-border/30 last:border-0 transition-colors"
+                                        onClick={() => {
+                                            setUtQuery(student.id);
+                                            setShowSuggestions(false);
+                                        }}
+                                    >
+                                        <span className="font-bold text-sm text-primary">{student.id}</span>
+                                        <span className="text-xs text-secondary mt-1 sm:mt-0">{student.name}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                     
                     <div className="space-y-2">
@@ -243,7 +400,7 @@ export default function ReportDirectory({ feedbacks, vivas = [], quizzes = [], a
                             </tr>
                         </thead>
                         <tbody>
-                            {filteredFeedbacks.map(f => (
+                            {paginatedFeedbacks.map(f => (
                                 <tr key={f.id}>
                                     <td className="text-xs text-secondary">{f.date}</td>
                                     <td className="font-bold text-sm tracking-tight">{f.ut_number}</td>
@@ -257,31 +414,148 @@ export default function ReportDirectory({ feedbacks, vivas = [], quizzes = [], a
                             ))}
                         </tbody>
                     </table>
+                    {renderPagination(filteredFeedbacks.length)}
                 </div>
             )}
 
             {activeTab === "vivas" && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {filteredVivas.map(viva => (
-                        <div key={viva.id} className="card p-6 border-accent/10 hover:border-accent/40 transition-all group">
-                            <div className="flex justify-between items-start mb-4">
-                                <span className="text-[10px] font-bold uppercase tracking-widest text-accent-color px-2 py-1 bg-accent/5 rounded-lg border border-accent/10">Viva Session</span>
-                                <span className="text-xs font-medium text-secondary bg-surface-container px-3 py-1 rounded-full">{new Date(viva.viva_date).toLocaleDateString()}</span>
+                <div className="space-y-6">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-surface-container-low p-4 rounded-xl border border-card-border/50">
+                        <div className="flex-1 w-full sm:w-auto">
+                            <label className="text-xs font-bold text-secondary uppercase tracking-widest block mb-2">Filter by Viva Session</label>
+                            <select 
+                                value={selectedVivaId}
+                                onChange={(e) => setSelectedVivaId(e.target.value)}
+                                className="w-full sm:max-w-md bg-surface-container-high border border-card-border/50 rounded-lg px-4 py-2 text-sm outline-none focus:border-accent-color/50 transition-colors"
+                            >
+                                <option value="">-- All Viva Sessions (Raw Records) --</option>
+                                {vivas.map(v => <option key={v.id} value={v.id}>{v.name} (Weighted Ledger)</option>)}
+                            </select>
+                        </div>
+                        {selectedVivaDetails && filteredVivaGroupedScores.length > 0 && (
+                            <ExportVivaReport viva={selectedVivaDetails} groupedScores={filteredVivaGroupedScores} />
+                        )}
+                    </div>
+
+                    {!selectedVivaId ? (
+                        <div className="card h-full">
+                            <div className="flex justify-between items-center mb-6">
+                                <h3 className="text-lg font-bold flex items-center gap-2">
+                                    <span className="text-accent-color">📋</span> All Viva Records
+                                </h3>
                             </div>
-                            <h4 className="text-xl font-bold mb-4">{viva.name}</h4>
-                            <div className="flex gap-2">
-                                <Link href={`/vivas/${viva.id}`} className="btn btn-secondary flex-1 py-2 text-xs">Manage</Link>
-                                <button 
-                                    onClick={() => handleExportViva(viva)}
-                                    disabled={exporting === viva.id}
-                                    className="btn btn-primary flex-1 py-2 text-xs"
-                                >
-                                    {exporting === viva.id ? "Exporting..." : "Export PDF"}
-                                </button>
+                            <div className="table-container" style={{ overflowX: 'auto' }}>
+                                <table className="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>UT Number</th>
+                                            <th>Student Name</th>
+                                            <th>Group</th>
+                                            <th>Event Name</th>
+                                            <th>Metric</th>
+                                            <th>Score</th>
+                                            <th>Lecturer</th>
+                                            <th>Remark</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {paginatedVivaFlatScores.map(v => (
+                                            <tr key={v.id}>
+                                                <td className="text-xs text-secondary">{new Date(v.viva_events?.viva_date).toLocaleDateString()}</td>
+                                                <td className="font-bold text-sm">{v.students?.student_id}</td>
+                                                <td className="text-primary font-bold">{v.students?.name}</td>
+                                                <td><span className="badge bg-surface-container text-secondary text-[10px]">{v.students?.group_name}</span></td>
+                                                <td className="text-xs font-bold">{v.viva_events?.name}</td>
+                                                <td className="text-xs text-secondary">{v.viva_criteria?.name}</td>
+                                                <td className="font-bold text-accent-color">{v.score} / {v.viva_criteria?.max_marks}</td>
+                                                <td className="text-xs text-accent-light">{v.users?.name}</td>
+                                                <td className="text-xs text-secondary italic max-w-xs truncate" title={v.remark}>{v.remark || "-"}</td>
+                                            </tr>
+                                        ))}
+                                        {filteredVivaFlatScores.length === 0 && <tr><td colSpan="9" className="text-center p-8 text-secondary">No viva scores recorded.</td></tr>}
+                                    </tbody>
+                                </table>
+                                {renderPagination(filteredVivaFlatScores.length)}
                             </div>
                         </div>
-                    ))}
-                    {filteredVivas.length === 0 && <p className="col-span-full text-center py-12 text-secondary">No viva events found.</p>}
+                    ) : isLoadingViva ? (
+                        <div className="text-center py-16 card">
+                            <div className="animate-spin inline-block w-8 h-8 border-4 border-current border-t-transparent text-accent-color rounded-full mb-3" role="status" aria-label="loading"></div>
+                            <p className="text-secondary">Loading ledger data...</p>
+                        </div>
+                    ) : (
+                        <div className="card h-full">
+                            <div className="flex justify-between items-center mb-6">
+                                <h3 className="text-lg font-bold flex items-center gap-2">
+                                    <span className="text-accent-color">📋</span> {selectedVivaDetails?.name} - Weighted Ledger
+                                </h3>
+                            </div>
+                            <div className="table-container" style={{ overflowX: 'auto' }}>
+                                <table className="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Student</th>
+                                            <th>Panelists</th>
+                                            {selectedVivaDetails?.criteria.map(c => (
+                                                <th key={c.id}>{c.name} <br/><span className="text-[10px] opacity-50 font-normal">(Max {c.max_marks})</span></th>
+                                            ))}
+                                            <th>Weighted Total</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {paginatedVivaGroupedScores.map((group, idx) => (
+                                            <tr key={idx} className="hover:bg-surface-container-high/30">
+                                                <td>
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-8 h-8 rounded-lg bg-surface-container-highest flex items-center justify-center font-bold text-xs">
+                                                            {group.student.name.charAt(0)}
+                                                        </div>
+                                                        <div>
+                                                            <p className="font-bold text-sm m-0">{group.student.name}</p>
+                                                            <p className="text-[10px] text-tertiary uppercase tracking-wider">{group.student.student_id}</p>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {Object.values(group.panelistData).map((p, pi) => (
+                                                            <span key={pi} className="text-[10px] bg-surface-container-highest px-1.5 py-0.5 rounded">
+                                                                {p.name}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                    <p className="text-[10px] text-tertiary mt-1">Last updated: {new Date(group.updated_at).toLocaleDateString()}</p>
+                                                </td>
+                                                {selectedVivaDetails?.criteria.map(c => (
+                                                    <td key={c.id} className="text-sm font-medium">
+                                                        {group.criteriaScores[c.id]}
+                                                        <span className="text-[10px] text-tertiary ml-1">/{c.max_marks}</span>
+                                                    </td>
+                                                ))}
+                                                <td>
+                                                    <div className="flex flex-col">
+                                                        <span className="font-bold text-sm text-accent-color">{group.total} / {group.max_total}</span>
+                                                        <span className="text-[10px] text-secondary">({((group.total / group.max_total) * 100).toFixed(1)}%)</span>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div className={`badge ${group.is_locked ? 'badge-admin' : 'badge-lecturer'}`} style={{ fontSize: '10px' }}>
+                                                        {group.is_locked ? (group.is_verified ? 'VERIFIED' : 'SUBMITTED') : 'DRAFT'}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                        {filteredVivaGroupedScores.length === 0 && (
+                                            <tr><td colSpan="10" className="text-center p-8 text-secondary">No records found for this selection.</td></tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                                {renderPagination(filteredVivaGroupedScores.length)}
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -300,7 +574,7 @@ export default function ReportDirectory({ feedbacks, vivas = [], quizzes = [], a
                             </tr>
                         </thead>
                         <tbody>
-                            {filteredQuizzes.map(q => (
+                            {paginatedQuizzes.map(q => (
                                 <tr key={q.id}>
                                     <td className="text-xs text-secondary">{new Date(q.created_at).toLocaleDateString()}</td>
                                     <td className="font-bold text-sm">{q.students?.student_id}</td>
@@ -318,6 +592,7 @@ export default function ReportDirectory({ feedbacks, vivas = [], quizzes = [], a
                             {filteredQuizzes.length === 0 && <tr><td colSpan="6" className="text-center p-8 text-secondary">No quiz marks recorded.</td></tr>}
                         </tbody>
                     </table>
+                    {renderPagination(filteredQuizzes.length)}
                 </div>
             )}
         </div>

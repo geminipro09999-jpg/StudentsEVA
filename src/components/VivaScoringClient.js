@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { findStudentByUT, submitScores, getStudentScores, getStudents } from "@/app/actions/scoringActions";
 import toast from "react-hot-toast";
 
@@ -13,6 +13,19 @@ export default function VivaScoringClient({ viva, isAdmin }) {
     const [existingScores, setExistingScores] = useState([]);
     const [remark, setRemark] = useState("");
     const [submitting, setSubmitting] = useState(false);
+    
+    // Autocomplete state
+    const [searchQuery, setSearchQuery] = useState("");
+    const [showSuggestions, setShowSuggestions] = useState(false);
+
+    const searchSuggestions = useMemo(() => {
+        if (!searchQuery || searchQuery.length < 1) return [];
+        const q = searchQuery.toLowerCase();
+        return allStudents.filter(s => 
+            s.student_id.toLowerCase().includes(q) || 
+            s.name.toLowerCase().includes(q)
+        ).slice(0, 8);
+    }, [searchQuery, allStudents]);
 
     useEffect(() => {
         const fetchAll = async () => {
@@ -50,17 +63,23 @@ export default function VivaScoringClient({ viva, isAdmin }) {
         setSearching(false);
     };
 
-    const handleSearch = async (e) => {
+    const handleSearchSubmit = async (e) => {
         e.preventDefault();
-        if (!utNumber.trim()) return;
-        performSearch(utNumber.trim());
+        if (!searchQuery.trim()) return;
+        
+        // If the query exactly matches a student ID, use it. Otherwise, use the first suggestion.
+        const match = allStudents.find(s => s.student_id.toLowerCase() === searchQuery.trim().toLowerCase());
+        const targetId = match ? match.student_id : (searchSuggestions.length > 0 ? searchSuggestions[0].student_id : searchQuery.trim());
+        
+        setSearchQuery("");
+        setShowSuggestions(false);
+        performSearch(targetId);
     };
 
-    const handleSelectStudent = (e) => {
-        const val = e.target.value;
-        if (!val) return;
-        setUtNumber(val);
-        performSearch(val);
+    const handleSelectSuggestion = (studentId) => {
+        setSearchQuery("");
+        setShowSuggestions(false);
+        performSearch(studentId);
     };
 
     const updateScore = (criteriaId, value, max) => {
@@ -92,7 +111,7 @@ export default function VivaScoringClient({ viva, isAdmin }) {
         });
 
         if (res.success) {
-            toast.success("Scores submitted successfully and locked.");
+            toast.success("Scores saved successfully.");
             // Refresh existing scores
             const scoreRes = await getStudentScores(viva.id, student.id);
             if (scoreRes.data) setExistingScores(scoreRes.data);
@@ -102,7 +121,7 @@ export default function VivaScoringClient({ viva, isAdmin }) {
         setSubmitting(false);
     };
 
-    const isLocked = existingScores.some(s => s.is_locked) || existingScores.some(s => s.is_verified);
+    const isVerified = existingScores.some(s => s.is_verified);
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -110,20 +129,46 @@ export default function VivaScoringClient({ viva, isAdmin }) {
                 <div className="card accent">
                     <h3 className="text-xl font-bold mb-4">Find Student</h3>
                     <div className="space-y-4">
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-secondary uppercase tracking-widest">Quick Select</label>
-                            <select 
-                                onChange={handleSelectStudent}
-                                className="w-full"
-                                value={student?.student_id || ""}
-                            >
-                                <option value="">-- Choose Student --</option>
-                                {allStudents.map(s => (
-                                    <option key={s.id} value={s.student_id}>
-                                        {s.name} ({s.student_id})
-                                    </option>
-                                ))}
-                            </select>
+                        <div className="relative z-50">
+                            <form onSubmit={handleSearchSubmit} className="flex gap-2">
+                                <input 
+                                    type="text" 
+                                    value={searchQuery} 
+                                    onChange={(e) => {
+                                        setSearchQuery(e.target.value);
+                                        setShowSuggestions(true);
+                                    }}
+                                    onFocus={() => setShowSuggestions(true)}
+                                    onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                                    placeholder="Type UT Number or Student Name..."
+                                    className="flex-1 w-full"
+                                    disabled={searching}
+                                />
+                                <button type="submit" disabled={searching} className="btn btn-primary px-6">
+                                    {searching ? "..." : "Search"}
+                                </button>
+                            </form>
+                            
+                            {showSuggestions && searchSuggestions.length > 0 && (
+                                <div className="absolute top-full left-0 right-0 mt-2 bg-card-bg border border-card-border/50 rounded-xl shadow-2xl overflow-hidden max-h-64 overflow-y-auto z-50">
+                                    {searchSuggestions.map(s => (
+                                        <div 
+                                            key={s.id}
+                                            className="px-4 py-3 hover:bg-accent/10 cursor-pointer flex justify-between items-center border-b border-card-border/30 last:border-0 transition-colors"
+                                            onClick={() => handleSelectSuggestion(s.student_id)}
+                                        >
+                                            <div>
+                                                <p className="font-bold text-sm text-primary m-0">{s.student_id}</p>
+                                                <p className="text-xs text-secondary m-0">{s.name}</p>
+                                            </div>
+                                            <div className="text-[10px] text-tertiary text-right hidden sm:block">
+                                                <p className="m-0">{s.course}</p>
+                                                <p className="m-0">Batch {s.batch}</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
 
                         <div className="relative">
@@ -131,22 +176,28 @@ export default function VivaScoringClient({ viva, isAdmin }) {
                                 <div className="w-full border-t border-card-border"></div>
                             </div>
                             <div className="relative flex justify-center text-xs uppercase">
-                                <span className="bg-surface px-2 text-tertiary">Or Search by UT</span>
+                                <span className="bg-surface px-2 text-tertiary">Or Browse</span>
                             </div>
                         </div>
 
-                        <form onSubmit={handleSearch} className="flex gap-2">
-                            <input 
-                                type="text" 
-                                value={utNumber} 
-                                onChange={(e) => setUtNumber(e.target.value)}
-                                placeholder="Enter UT Number (e.g., UT001)"
-                                className="flex-1"
-                            />
-                            <button type="submit" disabled={searching} className="btn btn-primary px-6">
-                                {searching ? "..." : "Search"}
-                            </button>
-                        </form>
+                        <div>
+                            <select 
+                                onChange={(e) => {
+                                    if(e.target.value) performSearch(e.target.value);
+                                    e.target.value = ""; // Reset after selection
+                                }}
+                                className="w-full text-sm bg-surface-container-high"
+                                defaultValue=""
+                                disabled={searching}
+                            >
+                                <option value="" disabled>-- Browse all students --</option>
+                                {allStudents.map(s => (
+                                    <option key={s.id} value={s.student_id}>
+                                        {s.name} ({s.student_id})
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
                     </div>
                 </div>
 
@@ -245,13 +296,13 @@ export default function VivaScoringClient({ viva, isAdmin }) {
             <div className="space-y-6">
                 {student ? (
                     <div className="card animate-fade-in relative">
-                        {isLocked && (
+                        {isVerified && (
                             <div className="absolute inset-0 bg-surface/50 backdrop-blur-[1px] z-10 flex items-center justify-center rounded-2xl">
                                 <div className="bg-surface-container p-4 rounded-xl shadow-xl border border-card-border flex items-center gap-3">
                                     <span className="text-2xl">🔒</span>
                                     <div>
-                                        <p className="font-bold">Scores Locked</p>
-                                        <p className="text-xs text-secondary">Contact Admin to make changes.</p>
+                                        <p className="font-bold">Scores Verified</p>
+                                        <p className="text-xs text-secondary">These scores have been verified by an admin and cannot be changed.</p>
                                     </div>
                                 </div>
                             </div>
@@ -279,7 +330,7 @@ export default function VivaScoringClient({ viva, isAdmin }) {
                                         value={scores[c.id] || ""}
                                         onChange={(e) => updateScore(c.id, e.target.value, c.max_marks)}
                                         placeholder={`Score (0-${c.max_marks})`}
-                                        disabled={isLocked}
+                                        disabled={isVerified}
                                         required={c.is_required !== false}
                                     />
                                 </div>
@@ -295,16 +346,16 @@ export default function VivaScoringClient({ viva, isAdmin }) {
                                     placeholder="Add overall session feedback, strengths, or areas for improvement..."
                                     rows="4"
                                     className="w-full bg-surface-container border-none rounded-xl p-4 text-sm focus:ring-2 focus:ring-accent-color transition-all resize-none"
-                                    disabled={isLocked}
+                                    disabled={isVerified}
                                 ></textarea>
                             </div>
 
                             <button 
                                 type="submit" 
-                                disabled={submitting || isLocked} 
+                                disabled={submitting || isVerified} 
                                 className="btn btn-primary w-full py-4 text-lg"
                             >
-                                {submitting ? "Submitting..." : "Submit Scores"}
+                                {submitting ? "Saving..." : (existingScores.length > 0 ? "Update Scores" : "Submit Scores")}
                             </button>
                         </form>
                     </div>

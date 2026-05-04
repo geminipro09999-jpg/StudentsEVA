@@ -11,7 +11,9 @@ export async function addUser(formData) {
         const roles = formData.getAll("roles");
         if (roles.length === 0) roles.push("lecturer"); // Default
 
-        const isAdmin = session?.user?.roles?.includes('admin') || session?.user?.role === 'admin';
+        const userRoles = session?.user?.roles || [];
+        const isAdmin = userRoles.some(r => ['admin', 'administrator'].includes(r)) || 
+                        ['admin', 'administrator'].includes(session?.user?.role);
         if (!isAdmin) {
             throw new Error("Unauthorized: Only administrators can create users.");
         }

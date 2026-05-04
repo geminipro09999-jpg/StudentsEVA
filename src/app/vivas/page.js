@@ -47,7 +47,12 @@ export default async function VivasPage() {
                                     🎤
                                 </div>
                                 <div>
-                                    <h3 className="text-xl font-bold tracking-tight m-0">{viva.name}</h3>
+                                    <h3 className="text-xl font-bold tracking-tight m-0 flex items-center gap-2">
+                                        {viva.name}
+                                        <div className={`badge ${viva?.is_active !== false ? 'badge-success' : 'badge-danger'}`} style={{ fontSize: '8px', padding: '2px 4px' }}>
+                                            {viva?.is_active !== false ? 'ACTIVE' : 'INACTIVE'}
+                                        </div>
+                                    </h3>
                                     <p className="text-secondary text-xs uppercase tracking-wider font-semibold mt-1">
                                         📅 {new Date(viva.viva_date).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}
                                     </p>
@@ -73,7 +78,10 @@ export default async function VivasPage() {
                                 {isAdmin ? '⚙️ Manage Event' : '📝 Score Students'}
                             </Link>
                             {isAdmin && (
-                                <DeleteVivaButton vivaId={viva.id} />
+                                <>
+                                    <VivaFormModal editMode={true} initialData={viva} potentialPanelists={potentialPanelists} />
+                                    <DeleteVivaButton vivaId={viva.id} />
+                                </>
                             )}
                         </div>
                     </div>

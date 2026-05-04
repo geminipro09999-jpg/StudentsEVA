@@ -9,7 +9,13 @@ export default function ProfilePage() {
     const { data: session, update } = useSession();
     const [loading, setLoading] = useState(false);
     const [passwordLoading, setPasswordLoading] = useState(false);
+    const [activeTab, setActiveTab] = useState("general");
+    
+    // Security states
     const [newPassword, setNewPassword] = useState("");
+    const [confirmPassword, setConfirmPassword] = useState("");
+    const [showPassword, setShowPassword] = useState(false);
+
     const [formData, setFormData] = useState({
         address: "",
         phone: "",
@@ -47,31 +53,35 @@ export default function ProfilePage() {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
+    const handleSaveProfile = async (e) => {
+        if (e) e.preventDefault();
         setLoading(true);
         const res = await updateProfile(session.user.id, formData);
         if (res.success) {
-            toast.success("Profile updated successfully!");
-            // Update session if needed
+            toast.success("Settings saved successfully!");
             update({
                 address: formData.address,
                 phone: formData.phone,
                 staff_email: formData.staff_email
             });
         } else {
-            toast.error(res.error || "Failed to update profile");
+            toast.error(res.error || "Failed to save settings");
         }
         setLoading(false);
     };
 
     const handlePasswordSubmit = async (e) => {
         e.preventDefault();
+        if (newPassword !== confirmPassword) {
+            toast.error("Passwords do not match!");
+            return;
+        }
         setPasswordLoading(true);
         const res = await updateMyPassword(session.user.id, newPassword);
         if (res.success) {
-            toast.success("Password updated successfully! Next login will require this new password.");
+            toast.success("Password updated successfully!");
             setNewPassword("");
+            setConfirmPassword("");
         } else {
             toast.error(res.error || "Failed to update password");
         }
@@ -80,38 +90,75 @@ export default function ProfilePage() {
 
     if (!session) return <div className="container mt-8 text-center">Please login to view profile.</div>;
 
+    const tabs = [
+        { id: "general", label: "General", icon: "👤" },
+        { id: "bank", label: "Bank Details", icon: "🏦" },
+        { id: "signature", label: "Digital Signature", icon: "🖋️" },
+        { id: "security", label: "Security", icon: "🔒" },
+    ];
+
     return (
-        <div className="container animate-fade-in mt-8">
-            <div className="page-hero">
-                <h2>👤 My Profile</h2>
-                <p>Manage your personal information and banking details for invoicing</p>
+        <div className="container animate-fade-in mt-8 pb-20">
+            <div className="page-hero text-center mb-12">
+                <h2 className="text-4xl font-bold mb-2">My Profile</h2>
+                <p className="text-secondary max-w-2xl mx-auto">Customize your account settings, business information, and security preferences</p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-8">
-                <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-                    <div className="glass-card">
-                        <h3 className="text-xl font-bold mb-6 text-accent">Contact Information</h3>
-                        <div className="flex flex-col gap-4">
+            {/* Tab Navigation - Centered */}
+            <div className="flex justify-center gap-3 mb-12 overflow-x-auto pb-4 scrollbar-hide">
+                {tabs.map(tab => (
+                    <button
+                        key={tab.id}
+                        onClick={() => setActiveTab(tab.id)}
+                        className={`btn ${activeTab === tab.id ? 'btn-primary' : 'btn-secondary'}`}
+                        style={{ 
+                            padding: '0.8rem 1.8rem', 
+                            whiteSpace: 'nowrap',
+                            minWidth: '160px',
+                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            boxShadow: activeTab === tab.id ? 'var(--shadow-glow)' : 'none',
+                            border: activeTab === tab.id ? '1px solid var(--accent-color)' : '1px solid var(--card-border)'
+                        }}
+                    >
+                        <span style={{ marginRight: '0.6rem', fontSize: '1.1rem' }}>{tab.icon}</span>
+                        <span className="font-semibold">{tab.label}</span>
+                    </button>
+                ))}
+            </div>
+
+            <div className="max-w-4xl mx-auto">
+                {/* General Tab */}
+                {activeTab === "general" && (
+                    <div className="glass-card animate-fade-in-scale">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-xl font-bold text-accent">Contact Information</h3>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
                                 <label>Full Name</label>
-                                <input type="text" value={session.user.name} disabled className="opacity-50" />
+                                <input type="text" value={session.user.name} disabled className="opacity-60 bg-surface-container" />
+                                <small className="text-secondary mt-1 block">Contact admin to change your name.</small>
                             </div>
                             <div>
-                                <label>Login Email (Read-only)</label>
-                                <input type="text" value={session.user.email} disabled className="opacity-50" />
+                                <label>Login Email</label>
+                                <input type="text" value={session.user.email} disabled className="opacity-60 bg-surface-container" />
+                                <small className="text-secondary mt-1 block">Used for authentication.</small>
                             </div>
-                            <div className="accent-group" style={{ padding: '1rem', background: 'rgba(99, 102, 241, 0.03)', borderRadius: '0.8rem', borderLeft: '4px solid var(--accent-color)' }}>
-                                <label style={{ color: 'var(--accent-color)', fontWeight: '600' }}>Official Email (for Invoices)</label>
+                            <div className="md:col-span-2 p-4 rounded-xl border border-accent/20 bg-accent/5">
+                                <label className="text-accent font-bold">Official Email (for Invoices)</label>
                                 <input
                                     type="email"
                                     name="staff_email"
                                     value={formData.staff_email}
                                     onChange={handleChange}
                                     placeholder="your-staff-id@unicomtic.com"
-                                    style={{ background: 'var(--card-bg)' }}
+                                    className="bg-surface-container-low"
                                 />
-                                <small className="text-secondary" style={{ fontSize: '0.75rem', marginTop: '0.5rem', display: 'block' }}>
-                                    This email will appear on your generated invoices instead of your login email.
+                                <small className="text-secondary mt-2 block">
+                                    This email will appear on your generated invoices and communications.
                                 </small>
                             </div>
                             <div>
@@ -119,24 +166,26 @@ export default function ProfilePage() {
                                 <input type="text" name="phone" value={formData.phone} onChange={handleChange} placeholder="+94 77 XXX XXXX" />
                             </div>
                             <div>
-                                <label>Personal Address</label>
+                                <label>Address</label>
                                 <textarea name="address" value={formData.address} onChange={handleChange} rows={3} placeholder="123 Road, City, Country" />
                             </div>
                         </div>
+                        <div className="mt-8 pt-6 border-t border-card-border flex justify-end">
+                            <button onClick={handleSaveProfile} disabled={loading} className="btn btn-primary px-8">
+                                {loading ? "Saving..." : "Save Contact Info"}
+                            </button>
+                        </div>
                     </div>
+                )}
 
-                    <button type="submit" disabled={loading} className="btn btn-primary p-4 text-lg">
-                        {loading ? "Saving Changes..." : "🚀 Save Profile Settings"}
-                    </button>
-                </form>
-
-                <div className="flex flex-col gap-8">
-                    <div className="glass-card">
-                        <h3 className="text-xl font-bold mb-6 text-accent">Bank Details (for Invoicing)</h3>
-                        <div className="flex flex-col gap-4">
+                {/* Bank Details Tab */}
+                {activeTab === "bank" && (
+                    <div className="glass-card animate-fade-in-scale">
+                        <h3 className="text-xl font-bold mb-6 text-accent">Bank Details (Invoicing)</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
                                 <label>Account Holder Name</label>
-                                <input type="text" name="account_name" value={formData.account_name} onChange={handleChange} placeholder="Full Name on Bank Account" />
+                                <input type="text" name="account_name" value={formData.account_name} onChange={handleChange} placeholder="Full Name as per Bank Account" />
                             </div>
                             <div>
                                 <label>Bank Name</label>
@@ -147,91 +196,151 @@ export default function ProfilePage() {
                                 <input type="text" name="account_no" value={formData.account_no} onChange={handleChange} placeholder="XXXXXXXXXX" />
                             </div>
                             <div>
-                                <label>Branch</label>
-                                <input type="text" name="branch" value={formData.branch} onChange={handleChange} placeholder="e.g. Jaffna Main Branch" />
+                                <label>Branch Name</label>
+                                <input type="text" name="branch" value={formData.branch} onChange={handleChange} placeholder="e.g. Jaffna Main" />
                             </div>
                         </div>
-                    </div>
-
-                    <div className="glass-card border-l-4 border-danger">
-                        <h3 className="text-xl font-bold mb-6 text-danger flex items-center gap-2">
-                            <span>🔒</span> Security Settings
-                        </h3>
-                        <form onSubmit={handlePasswordSubmit} className="flex flex-col gap-4">
-                            <div>
-                                <label>Set New Password</label>
-                                <input
-                                    type="password"
-                                    value={newPassword}
-                                    onChange={(e) => setNewPassword(e.target.value)}
-                                    placeholder="Enter new password (min 6 characters)"
-                                    required
-                                    minLength="6"
-                                    autoComplete="new-password"
-                                />
-                                <p className="text-xs text-secondary mt-1">If you update your password, your current session remains active, but you must use the new password next time.</p>
-                            </div>
-                            <button type="submit" disabled={passwordLoading || !newPassword} className="btn" style={{ background: 'var(--danger)', color: 'white', alignSelf: 'flex-start' }}>
-                                {passwordLoading ? "Updating..." : "Update Password"}
+                        <div className="mt-8 pt-6 border-t border-card-border flex justify-end">
+                            <button onClick={handleSaveProfile} disabled={loading} className="btn btn-primary px-8">
+                                {loading ? "Saving..." : "Save Bank Details"}
                             </button>
-                        </form>
+                        </div>
                     </div>
-                </div>
+                )}
 
-                <div className="glass-card mt-6">
-                    <h3 className="text-xl font-bold mb-6 text-accent">🖋️ Digital Signature</h3>
-                    <p className="text-sm text-secondary mb-4">
-                        Upload your e-signature image. This will be automatically added to your submitted invoices.
-                    </p>
+                {/* Digital Signature Tab */}
+                {activeTab === "signature" && (
+                    <div className="glass-card animate-fade-in-scale">
+                        <h3 className="text-xl font-bold mb-6 text-accent">🖋️ Digital Signature</h3>
+                        <p className="text-secondary mb-6">
+                            Upload a clear image of your signature. It will be automatically embedded into your invoices.
+                        </p>
+                        
+                        <div className="flex flex-col md:flex-row gap-8 items-center md:items-start">
+                            <div className="flex-1 w-full">
+                                {formData.e_signature ? (
+                                    <div className="p-4 bg-white rounded-xl border-2 border-dashed border-accent/30 flex flex-col items-center">
+                                        <img
+                                            src={formData.e_signature}
+                                            alt="Current Signature"
+                                            style={{ maxHeight: '120px', maxWidth: '100%' }}
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setFormData(p => ({ ...p, e_signature: "" }))}
+                                            className="text-xs text-danger mt-4 font-bold uppercase tracking-wider"
+                                        >
+                                            🗑️ Remove and Re-upload
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <label className="flex flex-col items-center justify-center p-12 border-2 border-dashed border-card-border rounded-2xl cursor-pointer hover:border-accent transition-colors bg-surface-container-low">
+                                        <span className="text-5xl mb-4">📤</span>
+                                        <span className="font-bold">Upload Signature Image</span>
+                                        <span className="text-xs text-secondary mt-2">PNG/JPG (transparent PNG recommended)</span>
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            className="hidden"
+                                            onChange={async (e) => {
+                                                const file = e.target.files[0];
+                                                if (file) {
+                                                    const reader = new FileReader();
+                                                    reader.onloadend = () => {
+                                                        setFormData(p => ({ ...p, e_signature: reader.result }));
+                                                    };
+                                                    reader.readAsDataURL(file);
+                                                }
+                                            }}
+                                        />
+                                    </label>
+                                )}
+                            </div>
+                            
+                            <div className="flex-1">
+                                <div className="p-4 rounded-xl bg-surface-container-high border border-card-border h-full">
+                                    <h4 className="font-bold mb-2">Instructions:</h4>
+                                    <ul className="text-sm text-secondary flex flex-col gap-2 list-disc pl-4">
+                                        <li>Sign on a clean white piece of paper.</li>
+                                        <li>Take a well-lit photo or scan.</li>
+                                        <li>Crop the image to focus on the signature.</li>
+                                        <li>Maximum recommended size: 600x200px.</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
 
-                    <div className="flex flex-col gap-4 items-center">
-                        {formData.e_signature ? (
-                            <div className="signature-preview-container mb-4">
-                                <img
-                                    src={formData.e_signature}
-                                    alt="Signature Preview"
-                                    style={{ maxHeight: '80px', border: '1px dashed var(--accent-light)', padding: '10px', background: 'white' }}
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setFormData(p => ({ ...p, e_signature: "" }))}
-                                    className="text-xs text-red-500 mt-2 block mx-auto underline"
+                        <div className="mt-8 pt-6 border-t border-card-border flex justify-end">
+                            <button onClick={handleSaveProfile} disabled={loading} className="btn btn-primary px-8">
+                                {loading ? "Saving..." : "Apply Signature"}
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Security Tab */}
+                {activeTab === "security" && (
+                    <div className="glass-card animate-fade-in-scale border-l-4 border-danger">
+                        <h3 className="text-xl font-bold mb-6 text-danger flex items-center gap-2">
+                            <span>🔒</span> Password Management
+                        </h3>
+                        
+                        <form onSubmit={handlePasswordSubmit} className="flex flex-col gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label>New Password</label>
+                                    <div style={{ position: 'relative' }}>
+                                        <input
+                                            type={showPassword ? "text" : "password"}
+                                            value={newPassword}
+                                            onChange={(e) => setNewPassword(e.target.value)}
+                                            placeholder="Minimum 6 characters"
+                                            required
+                                            minLength="6"
+                                            autoComplete="new-password"
+                                        />
+                                        <button 
+                                            type="button"
+                                            onClick={() => setShowPassword(!showPassword)}
+                                            style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem' }}
+                                        >
+                                            {showPassword ? "👁️" : "👁️‍🗨️"}
+                                        </button>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label>Confirm Password</label>
+                                    <input
+                                        type={showPassword ? "text" : "password"}
+                                        value={confirmPassword}
+                                        onChange={(e) => setConfirmPassword(e.target.value)}
+                                        placeholder="Repeat new password"
+                                        required
+                                    />
+                                </div>
+                            </div>
+                            
+                            <div className="p-4 rounded-xl bg-danger/5 border border-danger/20">
+                                <p className="text-xs text-secondary leading-relaxed">
+                                    Updating your password will not log you out of your current session. 
+                                    However, you must use the new password for all future login attempts. 
+                                    Please ensure you remember it before clicking update.
+                                </p>
+                            </div>
+
+                            <div className="pt-4 flex justify-end">
+                                <button 
+                                    type="submit" 
+                                    disabled={passwordLoading || !newPassword || newPassword !== confirmPassword} 
+                                    className="btn btn-primary px-10"
+                                    style={{ background: 'var(--danger)', border: 'none' }}
                                 >
-                                    Remove Signature
+                                    {passwordLoading ? "Updating..." : "Update Security Key"}
                                 </button>
                             </div>
-                        ) : (
-                            <div className="text-center p-8 border-2 border-dashed border-gray-400 rounded-xl w-full">
-                                <span className="text-4xl">🖋️</span>
-                                <p className="text-sm mt-2">No signature uploaded</p>
-                            </div>
-                        )}
-
-                        <div className="w-full">
-                            <label className="btn btn-secondary w-full cursor-pointer text-center">
-                                {formData.e_signature ? "🔄 Change Signature" : "📤 Upload Signature Image"}
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    className="hidden"
-                                    onChange={async (e) => {
-                                        const file = e.target.files[0];
-                                        if (file) {
-                                            const reader = new FileReader();
-                                            reader.onloadend = () => {
-                                                setFormData(p => ({ ...p, e_signature: reader.result }));
-                                            };
-                                            reader.readAsDataURL(file);
-                                        }
-                                    }}
-                                />
-                            </label>
-                            <small className="text-xs text-secondary mt-2 block text-center">
-                                Recommended size: 300x100px (PNG/JPG)
-                            </small>
-                        </div>
+                        </form>
                     </div>
-                </div>
+                )}
             </div>
         </div>
     );

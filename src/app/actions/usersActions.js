@@ -8,7 +8,9 @@ import bcrypt from "bcryptjs";
 export async function getUsers() {
     try {
         const session = await getServerSession(authOptions);
-        const isAdmin = session?.user?.roles?.includes('admin') || session?.user?.role === 'admin';
+        const roles = session?.user?.roles || [];
+        const isAdmin = roles.some(r => ['admin', 'administrator'].includes(r)) || 
+                        ['admin', 'administrator'].includes(session?.user?.role);
 
         if (!session || !isAdmin) {
             throw new Error("Unauthorized");
@@ -40,7 +42,9 @@ export async function getUsers() {
 export async function changeUserPassword(formData) {
     try {
         const session = await getServerSession(authOptions);
-        const isAdmin = session?.user?.roles?.includes('admin') || session?.user?.role === 'admin';
+        const roles = session?.user?.roles || [];
+        const isAdmin = roles.some(r => ['admin', 'administrator'].includes(r)) || 
+                        ['admin', 'administrator'].includes(session?.user?.role);
         if (!session || !isAdmin) throw new Error("Unauthorized");
 
         const userId = formData.get('userId');
@@ -67,7 +71,9 @@ export async function changeUserPassword(formData) {
 export async function updateUserRoles(userId, roles, paymentInfo = {}) {
     try {
         const session = await getServerSession(authOptions);
-        const isAdmin = session?.user?.roles?.includes('admin') || session?.user?.role === 'admin';
+        const userRoles = session?.user?.roles || [];
+        const isAdmin = userRoles.some(r => ['admin', 'administrator'].includes(r)) || 
+                        ['admin', 'administrator'].includes(session?.user?.role);
 
         if (!session || !isAdmin) {
             throw new Error("Unauthorized");
@@ -121,7 +127,9 @@ export async function updateUserRoles(userId, roles, paymentInfo = {}) {
 export async function updateUserName(userId, newName) {
     try {
         const session = await getServerSession(authOptions);
-        const isAdmin = session?.user?.roles?.includes('admin') || session?.user?.role === 'admin';
+        const roles = session?.user?.roles || [];
+        const isAdmin = roles.some(r => ['admin', 'administrator'].includes(r)) || 
+                        ['admin', 'administrator'].includes(session?.user?.role);
         if (!session || !isAdmin) throw new Error("Unauthorized");
 
         if (!userId || !newName?.trim()) throw new Error("User ID and name are required.");

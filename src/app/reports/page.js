@@ -4,6 +4,10 @@ import { supabase } from "@/lib/supabase";
 import { redirect } from "next/navigation";
 import ReportDirectory from "@/components/ReportDirectory";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+
 export default async function ReportsPage() {
     const session = await getServerSession(authOptions);
 
@@ -17,11 +21,26 @@ export default async function ReportsPage() {
         .select('*, students(name, student_id, group_name)')
         .order('created_at', { ascending: false });
 
-    // 2. Fetch Viva Events
+    // 2. Fetch Viva Events and Scores
     const { data: vivas } = await supabase
         .from('viva_events')
         .select('*')
         .order('viva_date', { ascending: false });
+
+    const { data: vivaScores } = await supabase
+        .from('viva_scores')
+        .select(`
+            id,
+            viva_id,
+            score,
+            remark,
+            updated_at,
+            students (name, student_id, group_name),
+            viva_criteria (name, max_marks),
+            users (name, email),
+            viva_events (name, viva_date)
+        `)
+        .order('updated_at', { ascending: false });
 
     // 3. Fetch Quiz Marks
     const { data: quizzes } = await supabase
@@ -71,6 +90,7 @@ export default async function ReportsPage() {
             <ReportDirectory 
                 feedbacks={formattedFeedbacks} 
                 vivas={vivas || []}
+                vivaScores={vivaScores || []}
                 quizzes={quizzes || []}
                 allSubjects={allSubjects} 
                 allLabs={allLabs} 

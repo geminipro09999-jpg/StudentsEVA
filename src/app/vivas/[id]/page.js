@@ -7,9 +7,13 @@ import Link from "next/link";
 import AdminScoreManagement from "@/components/AdminScoreManagement";
 import ExportVivaReport from "@/components/ExportVivaReport";
 import VivaMetricImportModal from "@/components/VivaMetricImportModal";
+import VivaFormModal from "@/components/VivaFormModal";
+import { getUsers } from "@/app/actions/usersActions";
 
-export default async function VivaDetailPage({ params }) {
+export default async function VivaDetailPage({ params, searchParams }) {
     const { id } = await params;
+    const resolvedSearchParams = await searchParams;
+    const currentPage = parseInt(resolvedSearchParams?.page || "1", 10);
     const session = await getServerSession(authOptions);
     if (!session) redirect("/login");
 
@@ -17,46 +21,64 @@ export default async function VivaDetailPage({ params }) {
     const isAdmin = roles.some(r => ['admin', 'administrator'].includes(r));
     if (!isAdmin) redirect("/viva-scoring");
 
-    const { data: viva } = await getVivaDetails(id);
+    const { data: viva, error } = await getVivaDetails(id);
+    
+    let potentialPanelists = [];
+    if (isAdmin) {
+        const { data: users } = await getUsers();
+        potentialPanelists = users || [];
+    }
+    
+    if (!viva) {
+        return (
+            <div className="container mt-20 text-center">
+                <h1 className="text-6xl font-bold opacity-20 mb-4">404</h1>
+                <h2 className="text-2xl font-bold mb-8">Viva Session Not Found</h2>
+                <Link href="/vivas" className="btn btn-primary px-8">Back to Vivas</Link>
+            </div>
+        );
+    }
+
     const { data: scores } = await getAllScoresForViva(id);
 
     const vivaTotal = viva?.criteria.reduce((s, c) => s + c.max_marks, 0) || 0;
     
-    // Group scores by student (merge different lecturers like Admin import + Staff entry)
+    // 3. Group scores by student and calculate weighted average
+    // panelists is an array of { user_id, weight, users: { name, ... } }
+    const panelistWeights = viva?.panelists?.reduce((acc, p) => {
+        acc[p.user_id] = p.weight;
+        return acc;
+    }, {}) || {};
+
     const groupedScoresMap = scores?.reduce((acc, score) => {
         const studentId = score.student_id;
+        const lecturerId = score.lecturer_id;
         
         if (!acc[studentId]) {
             acc[studentId] = {
                 student: score.students,
-                lecturerNames: new Set(),
-                criteriaScores: {},
+                panelistData: {}, // Store scores per panelist: { [lecturerId]: { [criteriaId]: score } }
                 remark: score.remark,
                 is_verified: score.is_verified,
                 is_locked: score.is_locked,
                 updated_at: score.updated_at,
-                lecturerId: score.lecturer_id // Default lecturer ID for editing
+                lecturerId: lecturerId // Representative lecturer ID
             };
         }
 
-        // Add lecturer name to the set (to display who contributed)
-        acc[studentId].lecturerNames.add(score.users.name);
-        
-        // If this record has more 'viva' like criteria or is from a non-admin, prefer this lecturerId
-        // In this project, 'Super Admin' is usually the one importing quiz marks
-        if (score.users.name !== 'Super Admin' && score.users.name !== 'admin') {
-            acc[studentId].lecturerId = score.lecturer_id;
+        if (!acc[studentId].panelistData[lecturerId]) {
+            acc[studentId].panelistData[lecturerId] = {
+                name: score.users.name,
+                scores: {}
+            };
         }
 
-        // Merge scores
-        acc[studentId].criteriaScores[score.criteria_id] = score.score;
+        acc[studentId].panelistData[lecturerId].scores[score.criteria_id] = score.score;
         
-        // Keep the latest update time
         if (new Date(score.updated_at) > new Date(acc[studentId].updated_at)) {
             acc[studentId].updated_at = score.updated_at;
         }
 
-        // Aggregate status
         if (score.is_locked) acc[studentId].is_locked = true;
         if (score.is_verified) acc[studentId].is_verified = true;
         if (score.remark && !acc[studentId].remark) acc[studentId].remark = score.remark;
@@ -64,19 +86,49 @@ export default async function VivaDetailPage({ params }) {
         return acc;
     }, {});
 
-    // Convert map to array and finalize display fields
+    // Convert map to array and calculate weighted totals
     const groupedScores = Object.values(groupedScoresMap || {}).map(group => {
-        const total = Object.values(group.criteriaScores).reduce((sum, s) => sum + s, 0);
+        const weightedCriteriaScores = {};
+        let finalTotal = 0;
+
+        // For each criteria in the viva
+        viva.criteria.forEach(c => {
+            let weightedScoreForMetric = 0;
+            let weightSumUsed = 0;
+
+            // Aggregate weighted contribution from each panelist who scored this student
+            Object.entries(group.panelistData).forEach(([lId, data]) => {
+                const score = data.scores[c.id];
+                const weight = panelistWeights[lId] || 0;
+                
+                if (score !== undefined) {
+                    weightedScoreForMetric += (score * weight) / 100;
+                    weightSumUsed += weight;
+                }
+            });
+
+            // If some panelists haven't scored yet, we might want to normalize?
+            // For now, we use the absolute weighted contribution based on assigned weights.
+            weightedCriteriaScores[c.id] = parseFloat(weightedScoreForMetric.toFixed(2));
+            finalTotal += weightedScoreForMetric;
+        });
+
         return {
             ...group,
-            total,
+            criteriaScores: weightedCriteriaScores,
+            total: parseFloat(finalTotal.toFixed(2)),
             max_total: vivaTotal,
-            lecturerName: Array.from(group.lecturerNames).join(', ')
+            lecturerName: Object.values(group.panelistData).map(p => p.name).join(', ')
         };
     });
 
     const totalEvaluations = Object.keys(groupedScores || {}).length;
     const verifiedEvaluations = Object.values(groupedScores || {}).filter(g => g.is_verified).length;
+
+    const ITEMS_PER_PAGE = 10;
+    const totalPages = Math.ceil(totalEvaluations / ITEMS_PER_PAGE) || 1;
+    const pageIndex = Math.max(1, Math.min(currentPage, totalPages));
+    const paginatedScores = groupedScores.slice((pageIndex - 1) * ITEMS_PER_PAGE, pageIndex * ITEMS_PER_PAGE);
 
     return (
         <div className="container animate-fade-in mt-4">
@@ -88,12 +140,16 @@ export default async function VivaDetailPage({ params }) {
                     <div>
                         <div className="flex items-center gap-3">
                             <h2 className="text-4xl font-bold bg-primary-gradient bg-clip-text text-transparent">{viva?.name}</h2>
+                            <div className={`badge ${viva?.is_active !== false ? 'badge-success' : 'badge-danger'}`} style={{ fontSize: '10px' }}>
+                                {viva?.is_active !== false ? 'ACTIVE' : 'INACTIVE'}
+                            </div>
                         </div>
                         <p className="text-secondary mt-1 flex items-center gap-2">
                             <span>📅 Scheduled: <strong>{new Date(viva?.viva_date).toLocaleDateString(undefined, { dateStyle: 'full' })}</strong></span>
                         </p>
                     </div>
                     <div className="flex gap-3">
+                        <VivaFormModal editMode={true} initialData={viva} potentialPanelists={potentialPanelists} />
                         <VivaMetricImportModal vivaId={id} criteria={viva.criteria} />
                         <ExportVivaReport viva={viva} groupedScores={groupedScores} />
                     </div>
@@ -105,7 +161,7 @@ export default async function VivaDetailPage({ params }) {
                 <div className="stat-card accent">
                     <label>Total Evaluations</label>
                     <h3 className="text-3xl font-bold">{totalEvaluations}</h3>
-                    <p className="text-xs text-secondary mt-2">Completed by assigned panelists</p>
+                    <p className="text-xs text-secondary mt-2">Unique students evaluated</p>
                 </div>
                 <div className="stat-card success">
                     <label>Verified Reports</label>
@@ -124,7 +180,7 @@ export default async function VivaDetailPage({ params }) {
                             ? (Object.values(groupedScores).reduce((acc, g) => acc + (g.total / g.max_total), 0) / totalEvaluations * 100).toFixed(1)
                             : 0}%
                     </h3>
-                    <p className="text-xs text-secondary mt-2">Overall cohort performance</p>
+                    <p className="text-xs text-secondary mt-2">Overall cohort weighted performance</p>
                 </div>
             </div>
 
@@ -133,8 +189,11 @@ export default async function VivaDetailPage({ params }) {
                     <div className="card h-full">
                         <div className="flex justify-between items-center mb-8">
                             <h3 className="text-xl font-bold flex items-center gap-2">
-                                <span className="text-accent-color">📋</span> Evaluation Ledger
+                                <span className="text-accent-color">📋</span> Weighted Evaluation Ledger
                             </h3>
+                            <div className="text-[10px] uppercase tracking-widest text-tertiary">
+                                Scores are calculated based on assigned panelist weights
+                            </div>
                         </div>
 
                         <div className="table-container">
@@ -142,17 +201,17 @@ export default async function VivaDetailPage({ params }) {
                                 <thead>
                                     <tr>
                                         <th>Student</th>
-                                        <th>Lecturer</th>
+                                        <th>Panelists</th>
                                         {viva?.criteria.map(c => (
                                             <th key={c.id}>{c.name}</th>
                                         ))}
-                                        <th>Total</th>
+                                        <th>Weighted Total</th>
                                         <th>Status</th>
                                         <th className="text-right">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {Object.values(groupedScores || {}).map((group, idx) => (
+                                    {paginatedScores.map((group, idx) => (
                                         <tr key={idx} className="hover:bg-surface-container-high/30">
                                             <td>
                                                 <div className="flex items-center gap-3">
@@ -166,25 +225,31 @@ export default async function VivaDetailPage({ params }) {
                                                 </div>
                                             </td>
                                             <td>
-                                                <p className="text-sm m-0">{group.lecturerName}</p>
-                                                <p className="text-[10px] text-tertiary">{new Date(group.updated_at).toLocaleDateString()}</p>
+                                                <div className="flex flex-wrap gap-1">
+                                                    {Object.values(group.panelistData).map((p, pi) => (
+                                                        <span key={pi} className="text-[10px] bg-surface-container-highest px-1.5 py-0.5 rounded">
+                                                            {p.name}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                                <p className="text-[10px] text-tertiary mt-1">Last updated: {new Date(group.updated_at).toLocaleDateString()}</p>
                                             </td>
-                                            {/* Individual Scores */}
+                                            {/* Weighted Individual Scores */}
                                             {viva.criteria.map(c => (
                                                 <td key={c.id} className="text-sm font-medium">
-                                                    {group.criteriaScores[c.id] !== undefined ? group.criteriaScores[c.id] : '—'}
+                                                    {group.criteriaScores[c.id]}
                                                     <span className="text-[10px] text-tertiary ml-1">/{c.max_marks}</span>
                                                 </td>
                                             ))}
                                             <td>
                                                 <div className="flex flex-col">
-                                                    <span className="font-bold text-sm">{group.total} / {group.max_total}</span>
-                                                    <span className="text-[10px] text-secondary">({(group.total / group.max_total * 100).toFixed(0)}%)</span>
+                                                    <span className="font-bold text-sm text-accent-color">{group.total} / {group.max_total}</span>
+                                                    <span className="text-[10px] text-secondary">({(group.total / group.max_total * 100).toFixed(1)}%)</span>
                                                 </div>
                                             </td>
                                             <td>
                                                 <div className={`badge ${group.is_locked ? 'badge-admin' : 'badge-lecturer'}`} style={{ fontSize: '10px' }}>
-                                                    {group.is_locked ? 'LOCKED' : 'DRAFT'}
+                                                    {group.is_locked ? (group.is_verified ? 'VERIFIED' : 'SUBMITTED') : 'DRAFT'}
                                                 </div>
                                             </td>
 
@@ -197,11 +262,13 @@ export default async function VivaDetailPage({ params }) {
                                                     initialRemark={group.remark}
                                                     criteria={viva.criteria}
                                                     isVerified={group.is_verified}
+                                                    panelistData={group.panelistData}
+                                                    panelistWeights={panelistWeights}
                                                 />
                                             </td>
                                         </tr>
                                     ))}
-                                    {Object.keys(groupedScores || {}).length === 0 && (
+                                    {totalEvaluations === 0 && (
                                         <tr>
                                             <td colSpan="6" className="text-center py-16">
                                                 <div className="opacity-20 text-5xl mb-3">📁</div>
@@ -212,6 +279,42 @@ export default async function VivaDetailPage({ params }) {
                                 </tbody>
                             </table>
                         </div>
+
+                        {/* Pagination Controls */}
+                        {totalPages > 1 && (
+                            <div className="flex items-center justify-between mt-6 border-t border-card-border pt-4">
+                                <span className="text-xs text-secondary">
+                                    Showing <span className="font-bold text-accent-color">{((pageIndex - 1) * ITEMS_PER_PAGE) + 1}</span> to <span className="font-bold text-accent-color">{Math.min(pageIndex * ITEMS_PER_PAGE, totalEvaluations)}</span> of <span className="font-bold text-accent-color">{totalEvaluations}</span> entries
+                                </span>
+                                <div className="flex gap-2">
+                                    {pageIndex > 1 ? (
+                                        <Link href={`/vivas/${id}?page=${pageIndex - 1}`} className="btn btn-secondary py-1 px-3 text-xs font-bold border border-card-border/50">
+                                            Previous
+                                        </Link>
+                                    ) : (
+                                        <button disabled className="btn btn-secondary py-1 px-3 text-xs font-bold border border-card-border/50 opacity-50 cursor-not-allowed">Previous</button>
+                                    )}
+                                    
+                                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                                        <Link 
+                                            key={page} 
+                                            href={`/vivas/${id}?page=${page}`}
+                                            className={`btn py-1 px-3 text-xs font-bold border transition-colors ${page === pageIndex ? 'bg-accent-glow text-accent-color border-accent-color/50' : 'btn-secondary border-card-border/50 hover:bg-surface-container-high'}`}
+                                        >
+                                            {page}
+                                        </Link>
+                                    ))}
+
+                                    {pageIndex < totalPages ? (
+                                        <Link href={`/vivas/${id}?page=${pageIndex + 1}`} className="btn btn-secondary py-1 px-3 text-xs font-bold border border-card-border/50">
+                                            Next
+                                        </Link>
+                                    ) : (
+                                        <button disabled className="btn btn-secondary py-1 px-3 text-xs font-bold border border-card-border/50 opacity-50 cursor-not-allowed">Next</button>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -229,16 +332,19 @@ export default async function VivaDetailPage({ params }) {
                     </div>
 
                     <div className="card">
-                        <h3 className="text-sm font-bold uppercase tracking-widest text-accent-color mb-4">Panel</h3>
-                        <div className="space-y-3">
+                        <h3 className="text-sm font-bold uppercase tracking-widest text-accent-color mb-4">Panelists & Weights</h3>
+                        <div className="space-y-4">
                             {viva?.panelists.map((p) => (
-                                <div key={p.user_id} className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-full bg-primary-gradient flex items-center justify-center font-bold text-[10px] text-surface">
+                                <div key={p.user_id} className="flex items-center gap-3 bg-surface-container-low p-2 rounded-lg border border-card-border/50">
+                                    <div className="w-8 h-8 rounded-full bg-primary-gradient flex items-center justify-center font-bold text-[10px] text-surface shrink-0">
                                         {p.users.name.charAt(0)}
                                     </div>
-                                    <div className="truncate">
+                                    <div className="flex-1 truncate">
                                         <p className="text-xs font-bold truncate m-0">{p.users.name}</p>
                                         <p className="text-[10px] text-tertiary truncate">{p.users.email}</p>
+                                    </div>
+                                    <div className="text-xs font-bold text-accent-color px-2 py-1 bg-accent-glow rounded-md">
+                                        {p.weight}%
                                     </div>
                                 </div>
                             ))}

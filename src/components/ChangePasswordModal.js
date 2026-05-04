@@ -7,13 +7,24 @@ export default function ChangePasswordModal({ user, onClose }) {
     const [error, setError] = useState("");
     const [success, setSuccess] = useState(false);
 
+    const [newPassword, setNewPassword] = useState("");
+    const [confirmPassword, setConfirmPassword] = useState("");
+    const [showPassword, setShowPassword] = useState(false);
+
     const handleSubmit = async (e) => {
         e.preventDefault();
+        
+        if (newPassword !== confirmPassword) {
+            setError("Passwords do not match");
+            return;
+        }
+
         setLoading(true);
         setError("");
 
-        const formData = new FormData(e.currentTarget);
+        const formData = new FormData();
         formData.append("userId", user.id);
+        formData.append("newPassword", newPassword);
 
         const res = await changeUserPassword(formData);
 
@@ -26,6 +37,11 @@ export default function ChangePasswordModal({ user, onClose }) {
                 onClose();
             }, 1500);
         }
+    };
+
+    const handleSetDefault = () => {
+        setNewPassword("Admin@123");
+        setConfirmPassword("Admin@123");
     };
 
     return (
@@ -64,9 +80,47 @@ export default function ChangePasswordModal({ user, onClose }) {
                 {!success && (
                     <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                         <div>
-                            <label>New Password</label>
-                            <input type="password" name="newPassword" placeholder="Minimum 6 characters" required minLength={6} />
+                            <div className="d-flex justify-between items-center mb-1">
+                                <label style={{ marginBottom: 0 }}>New Password</label>
+                                <button 
+                                    type="button" 
+                                    onClick={handleSetDefault}
+                                    style={{ background: 'none', border: 'none', color: 'var(--accent-color)', fontSize: '0.75rem', cursor: 'pointer', textDecoration: 'underline' }}
+                                >
+                                    Set to Admin@123
+                                </button>
+                            </div>
+                            <div style={{ position: 'relative' }}>
+                                <input 
+                                    type={showPassword ? "text" : "password"} 
+                                    value={newPassword}
+                                    onChange={(e) => setNewPassword(e.target.value)}
+                                    placeholder="Minimum 6 characters" 
+                                    required 
+                                    minLength={6} 
+                                    autoFocus
+                                />
+                                <button 
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.9rem' }}
+                                >
+                                    {showPassword ? "👁️" : "👁️‍🗨️"}
+                                </button>
+                            </div>
                         </div>
+
+                        <div>
+                            <label>Confirm Password</label>
+                            <input 
+                                type={showPassword ? "text" : "password"} 
+                                value={confirmPassword}
+                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                placeholder="Repeat new password" 
+                                required 
+                            />
+                        </div>
+
                         <div className="d-flex gap-1 mt-3">
                             <button type="button" onClick={onClose} className="btn btn-secondary flex-1">Cancel</button>
                             <button type="submit" disabled={loading} className="btn btn-primary flex-1">

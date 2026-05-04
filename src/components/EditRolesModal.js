@@ -61,7 +61,17 @@ export default function EditRolesModal({ user, onClose }) {
     ];
 
     return (
-        <div className="modal-overlay animate-fade-in">
+        <div className="modal-overlay animate-fade-in" style={{
+            position: 'fixed',
+            top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0, 0, 0, 0.7)',
+            backdropFilter: 'blur(5px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '1rem'
+        }}>
             <div className="modal-content animate-fade-in-scale p-0 flex flex-col" style={{ maxWidth: '550px', maxHeight: '90vh' }}>
                 {/* Header - Fixed */}
                 <div className="p-6 border-b border-card-border flex justify-between items-center bg-card-bg rounded-t-2xl sticky top-0 z-20">

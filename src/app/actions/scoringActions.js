@@ -172,6 +172,46 @@ export async function verifyScores(vivaId, studentId, lecturerId) {
     }
 }
 
+export async function updateMultiPanelistScores({ vivaId, studentId, panelistScores, remark }) {
+    try {
+        const session = await getServerSession(authOptions);
+        const isAdmin = session?.user?.roles?.includes('admin') || session?.user?.role === 'admin';
+        if (!session || !isAdmin) throw new Error("Unauthorized");
+
+        const scoresToUpdate = [];
+        Object.entries(panelistScores).forEach(([lecturerId, scores]) => {
+            Object.entries(scores).forEach(([criteriaId, score]) => {
+                scoresToUpdate.push({
+                    viva_id: vivaId,
+                    student_id: studentId,
+                    lecturer_id: lecturerId,
+                    criteria_id: criteriaId,
+                    score: parseFloat(score) || 0,
+                    remark: remark || "",
+                    is_locked: true,
+                    is_verified: true,
+                    updated_at: new Date().toISOString()
+                });
+            });
+        });
+
+        if (scoresToUpdate.length === 0) return { success: true };
+
+        const { error } = await supabase
+            .from('viva_scores')
+            .upsert(scoresToUpdate, { 
+                onConflict: 'viva_id, student_id, lecturer_id, criteria_id' 
+            });
+
+        if (error) throw error;
+
+        revalidatePath(`/vivas/${vivaId}`);
+        return { success: true };
+    } catch (error) {
+        return { error: error.message };
+    }
+}
+
 export async function updateScoresByAdmin({ vivaId, studentId, lecturerId, scores, remark }) {
     try {
         const session = await getServerSession(authOptions);

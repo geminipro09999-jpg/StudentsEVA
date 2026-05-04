@@ -27,9 +27,12 @@ export default function ExportVivaReport({ viva, groupedScores }) {
         doc.setFontSize(10);
         doc.text(`Criteria: ${criteriaList}`, 14, 60);
 
+        const panelistsList = viva.panelists.map(p => `${p.users.name} (${p.weight}%)`).join(", ");
+        doc.text(`Panel: ${panelistsList}`, 14, 67);
+
         // Table Data
         const criteriaNames = viva.criteria.map(c => c.name);
-        const tableColumn = ["Student", "UT Number", "Lecturer", ...criteriaNames, "Total", "Remark"];
+        const tableColumn = ["Student", "UT Number", "Panelists", ...criteriaNames, "Weighted Total", "Remark"];
         const tableRows = [];
 
         Object.values(groupedScores).forEach(group => {
@@ -51,7 +54,7 @@ export default function ExportVivaReport({ viva, groupedScores }) {
         });
 
         autoTable(doc, {
-            startY: 70,
+            startY: 75,
             head: [tableColumn],
             body: tableRows,
             theme: 'grid',
