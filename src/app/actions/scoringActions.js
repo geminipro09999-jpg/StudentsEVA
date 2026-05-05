@@ -112,12 +112,8 @@ export async function getStudentScores(vivaId, studentId) {
             .from('viva_scores')
             .select('*, users(name), viva_criteria(name, max_marks)')
             .eq('viva_id', vivaId)
-            .eq('student_id', studentId);
-
-        if (!isAdmin) {
-            // Staff only see their own scores
-            query = query.eq('lecturer_id', session.user.id);
-        }
+            .eq('student_id', studentId)
+            .eq('lecturer_id', session.user.id);
 
         const { data, error } = await query;
         if (error) throw error;
