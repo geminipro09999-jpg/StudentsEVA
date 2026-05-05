@@ -65,15 +65,6 @@ export default function VivaFormModal({ potentialPanelists, editMode = false, in
         } else {
             newPanelists = [...formData.panelists, { user_id: userId, weight: 0 }];
         }
-        
-        // Auto-distribute weights evenly if they are all 0 or if it's the first one
-        if (newPanelists.length > 0) {
-            const evenWeight = Math.floor(100 / newPanelists.length);
-            newPanelists = newPanelists.map((p, i) => ({
-                ...p,
-                weight: i === newPanelists.length - 1 ? 100 - (evenWeight * (newPanelists.length - 1)) : evenWeight
-            }));
-        }
 
         setFormData({ ...formData, panelists: newPanelists });
     };
@@ -98,11 +89,6 @@ export default function VivaFormModal({ potentialPanelists, editMode = false, in
         }
         if (formData.panelists.length === 0) {
             return toast.error("Please select at least one panelist");
-        }
-
-        const totalWeight = formData.panelists.reduce((sum, p) => sum + p.weight, 0);
-        if (Math.abs(totalWeight - 100) > 0.01) {
-            return toast.error(`Total panelist weight must be 100%. Current: ${totalWeight}%`);
         }
 
         setLoading(true);
@@ -274,7 +260,7 @@ export default function VivaFormModal({ potentialPanelists, editMode = false, in
                                         <span className="text-xl">👥</span>
                                         <h4 className="text-sm font-bold uppercase tracking-widest m-0">Assigned Panelists</h4>
                                     </div>
-                                    <div className={`text-xs font-bold px-2 py-1 rounded ${Math.abs(totalWeight - 100) < 0.1 ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'}`}>
+                                    <div className="text-xs font-bold px-2 py-1 rounded bg-surface-container-low text-secondary">
                                         Total Weight: {totalWeight}%
                                     </div>
                                 </div>
@@ -363,7 +349,7 @@ export default function VivaFormModal({ potentialPanelists, editMode = false, in
                                             </div>
                                         )}
                                     </div>
-                                    <p className="text-[10px] text-tertiary mt-2 ml-1">Assign multiple panelists and define their scoring weight (must total 100%).</p>
+                                    <p className="text-[10px] text-tertiary mt-2 ml-1">Assign multiple panelists and define their scoring weight (e.g., 70% and 30% for a panel).</p>
                                 </div>
                             </div>
 
