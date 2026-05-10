@@ -202,26 +202,25 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
             doc.setFontSize(11);
             doc.setTextColor(0, 0, 0);
             doc.setFont('helvetica', 'bold');
-            doc.text(`Name : ${lecturerInfo?.name || 'Your Name'}`, 20, 50);
+            doc.text(`${lecturerInfo?.name || 'Your Name'}`, 20, 50);
 
             doc.setFont('helvetica', 'normal');
             doc.setFontSize(10);
             const addressText = lecturerInfo?.address || '';
             const addressLines = addressText.split('\n').filter(l => l.trim() !== '');
             const combinedLines = addressLines.length > 0
-                ? [`Address : ${addressLines[0]}`, ...addressLines.slice(1)]
-                : ['Address : '];
+                ? [`Address: ${addressLines[0]}`, ...addressLines.slice(1)]
+                : ['Address: '];
 
             doc.text([
                 ...combinedLines,
-                `Tel: ${lecturerInfo?.phone || '-'}`,
                 `Email: ${lecturerInfo?.staff_email || lecturerInfo?.email}`
             ], 20, 58);
 
             // 3. Invoice Meta (Top Right)
             doc.setFont('helvetica', 'bold');
-            doc.text(`Invoice No :`, 140, 58);
-            doc.text(`Date :`, 140, 72);
+            doc.text(`Invoice No:`, 140, 58);
+            doc.text(`Date:`, 140, 72);
 
             doc.setFont('helvetica', 'normal');
             doc.text(displayInvoiceNo, 175, 58);
@@ -371,11 +370,11 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
                     children: [
                         new Paragraph({ children: [new TextRun({ text: 'TIMESHEET INVOICE', bold: true, size: 36 })], alignment: AlignmentType.CENTER, spacing: { after: 100 } }),
                         new Paragraph({ children: [new TextRun({ text: 'Student Evaluation System — UnicomTIC and Innovation Center', size: 20, color: '666666' })], alignment: AlignmentType.CENTER, spacing: { after: 300 } }),
-                        new Paragraph({ children: [new TextRun({ text: `Name : ${lecturerInfo?.name || 'Your Name'}`, bold: true, size: 28, color: '6366F1' })] }),
-                        ...String(lecturerInfo?.address || 'Address').split('\n').filter(l => l.trim() !== '').map((l, i) =>
-                            new Paragraph({ children: [new TextRun({ text: i === 0 ? `Address : ${l}` : l, size: 20 })] })
+                        new Paragraph({ children: [new TextRun({ text: `${lecturerInfo?.name || 'Your Name'}`, bold: true, size: 28, color: '6366F1' })] }),
+                        ...String(lecturerInfo?.address || '').split('\n').filter(l => l.trim() !== '').map((l, i) =>
+                            new Paragraph({ children: [new TextRun({ text: i === 0 ? `Address: ${l}` : l, size: 20 })] })
                         ),
-                        new Paragraph({ children: [new TextRun({ text: `Tel: ${lecturerInfo?.phone || '-'}`, size: 20 })] }),
+                        ...(lecturerInfo?.address ? [] : [new Paragraph({ children: [new TextRun({ text: 'Address: ', size: 20 })] })]),
                         new Paragraph({ children: [new TextRun({ text: `Email: ${lecturerInfo?.staff_email || lecturerInfo?.email}`, size: 20 })] }),
 
                         new Paragraph({ children: [new TextRun({ text: `Generated: ${new Date().toLocaleDateString()}`, size: 18, color: '999999' })], spacing: { after: 300 } }),
@@ -594,14 +593,13 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
                     {/* Details Row */}
                     <div className="flex justify-between mb-12">
                         <div className="flex flex-col gap-1 w-1/2">
-                            <h2 className="text-xl font-bold"><span className="opacity-80 font-normal">Name :</span> {lecturerInfo?.name || 'Your Name'}</h2>
-                            <p className="text-sm mt-1 whitespace-pre-wrap"><strong className="opacity-80 font-normal">Address :</strong> {lecturerInfo?.address || '-'}</p>
-                            <p className="text-sm mt-2"><strong className="opacity-80 font-normal">Tel :</strong> {lecturerInfo?.phone || '-'}</p>
-                            <p className="text-sm"><strong className="opacity-80 font-normal">Email :</strong> {lecturerInfo?.staff_email || lecturerInfo?.email}</p>
+                            <h2 className="text-xl font-bold">{lecturerInfo?.name || 'Your Name'}</h2>
+                            <p className="text-sm mt-1 whitespace-pre-wrap"><strong className="opacity-80 font-normal">Address:</strong> {lecturerInfo?.address || ''}</p>
+                            <p className="text-sm"><strong className="opacity-80 font-normal">Email:</strong> {lecturerInfo?.staff_email || lecturerInfo?.email}</p>
                         </div>
                         <div className="text-right">
-                            <p className="text-sm"><strong>Invoice No :</strong> {displayInvoiceNo}</p>
-                            <p className="text-sm"><strong>Date :</strong> 15/{String(selectedMonth).padStart(2, '0')}/{selectedYear}</p>
+                            <p className="text-sm"><strong>Invoice No:</strong> {displayInvoiceNo}</p>
+                            <p className="text-sm"><strong>Date:</strong> 15/{String(selectedMonth).padStart(2, '0')}/{selectedYear}</p>
                         </div>
                     </div>
 
