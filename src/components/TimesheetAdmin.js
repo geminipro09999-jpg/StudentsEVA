@@ -289,6 +289,9 @@ export default function TimesheetAdmin({ entries, lecturers }) {
                                     const s = STATUS_MAP[e.status] || STATUS_MAP.pending;
                                     return (
                                         <tr key={e.id}>
+                                            <td className="text-center">
+                                                <input type="checkbox" checked={selected.has(e.id)} onChange={() => toggle(e.id)} />
+                                            </td>
                                             <td className="font-bold text-primary">
                                                 {e.users?.name || lecturerMap[e.lecturer_id] || 'Unknown'}
                                             </td>
