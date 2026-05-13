@@ -41,7 +41,16 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
     const monthName = MONTH_NAMES[Number(selectedMonth)] || '';
     const periodLabel = `${monthName} ${selectedYear}`;
     const dbInvoiceNo = `INV-${selectedYear}${String(selectedMonth).padStart(2, '0')}-${(selectedLecturer || '').slice(0, 6).toUpperCase()}`;
-    const displayInvoiceNo = String(selectedMonth).padStart(4, '0');
+    const displayInvoiceNo = useMemo(() => {
+        if (existingInvoice?.invoice_data?.displayInvoiceNo) {
+            return String(existingInvoice.invoice_data.displayInvoiceNo);
+        }
+        if (!selectedLecturer) return '10000';
+        const userInvoices = [...invoices].filter(inv => inv.user_id === selectedLecturer)
+            .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+        const existingIdx = userInvoices.findIndex(inv => inv.month === monthName && inv.year === selectedYear);
+        return existingIdx !== -1 ? String(10000 + existingIdx) : String(10000 + userInvoices.length);
+    }, [existingInvoice, invoices, selectedLecturer, monthName, selectedYear]);
 
     const existingInvoice = useMemo(() => {
         return invoices.find(inv =>
@@ -169,7 +178,8 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
             lecturerEmail: lecturerInfo?.staff_email || lecturerInfo?.email,
             invoiceType: activeBasis === 'monthly' ? 'fixed' : 'timesheet',
             description: activeDescription,
-            extraPayments: extraPayments
+            extraPayments: extraPayments,
+            displayInvoiceNo: displayInvoiceNo
         });
 
         if (res.success) {

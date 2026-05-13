@@ -61,12 +61,21 @@ export default function AdminInvoicesPage() {
             const rMap = {};
             const nMap = {};
             const dateMap = {};
+
+            const userInvoicesMap = {};
+            const sortedData = [...(data || [])].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+            sortedData.forEach(inv => {
+                if (!userInvoicesMap[inv.user_id]) userInvoicesMap[inv.user_id] = 0;
+                const seq = 10000 + userInvoicesMap[inv.user_id];
+                userInvoicesMap[inv.user_id]++;
+                nMap[inv.id] = inv.invoice_data?.displayInvoiceNo || String(seq);
+            });
+
             (data || []).forEach(inv => {
                 dMap[inv.id] = inv.deductions || 0;
                 bMap[inv.id] = inv.amount || 0;
                 descMap[inv.id] = inv.invoice_data?.description || "";
                 rMap[inv.id] = inv.invoice_data?.activeRate || inv.invoice_data?.hourlyRate || 0;
-                nMap[inv.id] = inv.invoice_data?.displayInvoiceNo || String(MONTH_NAMES.indexOf(inv.month)).padStart(4, '0');
                 dateMap[inv.id] = inv.invoice_data?.displayDate || `15/${String(MONTH_NAMES.indexOf(inv.month)).padStart(2, '0')}/${inv.year}`;
             });
             setDeductionsMap(dMap);
