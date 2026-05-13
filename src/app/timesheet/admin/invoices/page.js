@@ -92,6 +92,17 @@ export default function AdminInvoicesPage() {
 
     const handleApprove = async (invoiceId) => {
         setUpdatingId(invoiceId);
+
+        // Persist the invoice number edit if changed in the table
+        const inv = invoices.find(i => i.id === invoiceId);
+        if (inv && invoiceNosMap[invoiceId] !== inv.invoice_data?.displayInvoiceNo) {
+            const updatedData = {
+                ...inv.invoice_data,
+                displayInvoiceNo: invoiceNosMap[invoiceId]
+            };
+            await updateInvoiceData(invoiceId, updatedData);
+        }
+
         const res = await approveInvoice(invoiceId, {
             status: 'approved',
             amount: Number(baseAmtMap[invoiceId] || 0),
@@ -363,7 +374,8 @@ export default function AdminInvoicesPage() {
                 totalHours: totalHours,
                 totalUnits: totalUnits,
                 activeRate: rate,
-                calculatedGross
+                calculatedGross,
+                displayInvoiceNo: invoiceNosMap[selectedInvoice.id]
             };
 
             const res = await updateInvoiceData(selectedInvoice.id, updatedData);
@@ -463,7 +475,16 @@ export default function AdminInvoicesPage() {
                                             <div className="text-xs text-secondary">{inv.users?.staff_email || inv.users?.email}</div>
                                         </td>
                                         <td>{inv.month} {inv.year}</td>
-                                        <td className="text-xs font-mono">00 {String(inv.month_no || new Date(`${inv.month} 1, ${inv.year}`).getMonth() + 1).padStart(2, '0')}</td>
+                                        <td>
+                                            <input
+                                                type="text"
+                                                value={invoiceNosMap[inv.id] || ''}
+                                                onChange={(e) => setInvoiceNosMap({...invoiceNosMap, [inv.id]: e.target.value})}
+                                                disabled={inv.status !== 'pending' || updatingId === inv.id}
+                                                className="table-input font-mono text-xs"
+                                                style={{ width: '80px', padding: '0.2rem 0.5rem' }}
+                                            />
+                                        </td>
                                         <td>
                                             <input
                                                 type="number"
