@@ -41,6 +41,15 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
     const monthName = MONTH_NAMES[Number(selectedMonth)] || '';
     const periodLabel = `${monthName} ${selectedYear}`;
     const dbInvoiceNo = `INV-${selectedYear}${String(selectedMonth).padStart(2, '0')}-${(selectedLecturer || '').slice(0, 6).toUpperCase()}`;
+
+    const existingInvoice = useMemo(() => {
+        return invoices.find(inv =>
+            inv.month === monthName &&
+            inv.year === selectedYear &&
+            (initialIsAdmin ? inv.user_id === selectedLecturer : true)
+        );
+    }, [invoices, monthName, selectedYear, selectedLecturer, initialIsAdmin]);
+
     const displayInvoiceNo = useMemo(() => {
         if (existingInvoice?.invoice_data?.displayInvoiceNo) {
             return String(existingInvoice.invoice_data.displayInvoiceNo);
@@ -51,14 +60,6 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
         const existingIdx = userInvoices.findIndex(inv => inv.month === monthName && inv.year === selectedYear);
         return existingIdx !== -1 ? String(10000 + existingIdx) : String(10000 + userInvoices.length);
     }, [existingInvoice, invoices, selectedLecturer, monthName, selectedYear]);
-
-    const existingInvoice = useMemo(() => {
-        return invoices.find(inv =>
-            inv.month === monthName &&
-            inv.year === selectedYear &&
-            (initialIsAdmin ? inv.user_id === selectedLecturer : true)
-        );
-    }, [invoices, monthName, selectedYear, selectedLecturer, initialIsAdmin]);
 
     // Auto-set default basis based on user settings when lecturer changes
     useEffect(() => {
