@@ -147,11 +147,18 @@ export default function AdminInvoicesPage() {
             const displayInvNo = invoiceNosMap[inv.id] || String(inv.month_no || MONTH_NAMES.indexOf(inv.month)).padStart(4, '0');
             const displayDate = datesMap[inv.id] || `15/${String(inv.month_no || MONTH_NAMES.indexOf(inv.month)).padStart(2, '0')}/${inv.year}`;
 
+            const addressText = staff.address || '';
+            const addressLines = addressText.split('\n').filter(l => l.trim() !== '');
+            const combinedLines = addressLines.length > 0
+                ? [`Address: ${addressLines[0]}`, ...addressLines.slice(1)]
+                : ['Address: '];
+
             doc.text([
+                ...combinedLines,
                 `Email: ${staff.staff_email || staff.email}`,
                 `Invoice No: ${displayInvNo}`,
                 `Date: ${displayDate}`
-            ], 20, 58);
+            ], 20, 55);
 
             // Client Info (Right)
             doc.text([
@@ -168,15 +175,28 @@ export default function AdminInvoicesPage() {
 
             const currentDescription = descriptionsMap[inv.id] || inv.invoice_data?.description || `consultation and development services for the month of ${inv.month} ${inv.year}`;
 
+            const extraPayments = inv.invoice_data?.extraPayments || [];
+            const activeRatePdf = (ratesMap[inv.id] || inv.invoice_data?.activeRate || inv.invoice_data?.hourlyRate || 0);
+            const extraPaymentsTotalPdf = extraPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+            const baseTotalPdf = currentBase - extraPaymentsTotalPdf;
+
             const head = isMonthly ? [['Description', 'Total - LKR']] : [['Description', 'Unit', 'Rate per Unit', 'Total - LKR']];
             const body = isMonthly 
-                ? [[currentDescription, currentBase.toLocaleString()]]
+                ? [[currentDescription, baseTotalPdf.toLocaleString()]]
                 : [[
                     currentDescription,
                     `${displayUnit} ${unitLabel}`,
-                    (ratesMap[inv.id] || inv.invoice_data?.activeRate || inv.invoice_data?.hourlyRate || 0).toLocaleString(),
-                    currentBase.toLocaleString()
+                    activeRatePdf.toLocaleString(),
+                    baseTotalPdf.toLocaleString()
                 ]];
+
+            extraPayments.forEach(payment => {
+                if (isMonthly) {
+                    body.push([payment.description, Number(payment.amount).toLocaleString()]);
+                } else {
+                    body.push([payment.description, '-', '-', Number(payment.amount).toLocaleString()]);
+                }
+            });
 
             // Table
             autoTable(doc, {
@@ -260,17 +280,20 @@ export default function AdminInvoicesPage() {
 
     const [selectedInvoice, setSelectedInvoice] = useState(null);
     const [editingItems, setEditingItems] = useState([]);
+    const [editingExtraPayments, setEditingExtraPayments] = useState([]);
     const [isSavingCorrections, setIsSavingCorrections] = useState(false);
 
     const openDetails = (inv) => {
         setSelectedInvoice(inv);
         setEditingItems(JSON.parse(JSON.stringify(inv.invoice_data?.items || [])));
+        setEditingExtraPayments(JSON.parse(JSON.stringify(inv.invoice_data?.extraPayments || [])));
     };
 
     const closeDetails = () => {
         if (isSavingCorrections) return;
         setSelectedInvoice(null);
         setEditingItems([]);
+        setEditingExtraPayments([]);
     };
 
     const handleItemChange = (index, field, value) => {
@@ -297,6 +320,20 @@ export default function AdminInvoicesPage() {
         setEditingItems(editingItems.filter((_, i) => i !== index));
     };
 
+    const handleExtraPaymentChange = (index, field, value) => {
+        const updated = [...editingExtraPayments];
+        updated[index][field] = value;
+        setEditingExtraPayments(updated);
+    };
+
+    const handleRemoveExtraPayment = (index) => {
+        setEditingExtraPayments(editingExtraPayments.filter((_, i) => i !== index));
+    };
+
+    const handleAddExtraPayment = () => {
+        setEditingExtraPayments([...editingExtraPayments, { id: Date.now(), description: 'Study Material Preparation', amount: 0 }]);
+    };
+
     const handleSaveCorrections = async () => {
         setIsSavingCorrections(true);
         try {
@@ -304,12 +341,16 @@ export default function AdminInvoicesPage() {
             const totalHours = basis === 'hourly' ? editingItems.reduce((sum, item) => sum + Number(item.hours || 0), 0) : 0;
             const totalUnits = basis === 'unit' ? [...new Set(editingItems.map(e => e.work_date))].length : (basis === 'monthly' ? 1 : totalHours);
             const rate = Number(ratesMap[selectedInvoice.id] || 0);
-            const calculatedGross = basis === 'monthly' ? rate : (totalUnits * rate);
+            
+            const extraPaymentsTotal = editingExtraPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+            const baseGross = basis === 'monthly' ? rate : (totalUnits * rate);
+            const calculatedGross = baseGross + extraPaymentsTotal;
 
             const updatedData = {
                 ...selectedInvoice.invoice_data,
                 description: descriptionsMap[selectedInvoice.id],
                 items: (basis === 'monthly') ? [] : editingItems,
+                extraPayments: editingExtraPayments,
                 totalHours: totalHours,
                 totalUnits: totalUnits,
                 activeRate: rate,
@@ -710,6 +751,60 @@ export default function AdminInvoicesPage() {
                                 </div>
                             </>
                         )}
+
+                        {/* Extra Payments Editor */}
+                        <>
+                            <div className="flex justify-between items-center mb-4 mt-6">
+                                <h4 className="text-sm font-bold uppercase tracking-wider mb-0 text-primary">Additional Payments</h4>
+                                {selectedInvoice.status === 'pending' && (
+                                    <button
+                                        onClick={handleAddExtraPayment}
+                                        className="btn btn-secondary px-3 py-1 text-xs flex items-center gap-2"
+                                    >
+                                        + Add Item
+                                    </button>
+                                )}
+                            </div>
+                            {editingExtraPayments.length > 0 ? (
+                                <div className="flex flex-col gap-3 mb-4">
+                                    {editingExtraPayments.map((payment, idx) => (
+                                        <div key={payment.id || idx} className="flex gap-4 items-end">
+                                            <div className="flex-1">
+                                                <label className="text-xs">Description</label>
+                                                <input
+                                                    type="text"
+                                                    value={payment.description}
+                                                    onChange={e => handleExtraPaymentChange(idx, 'description', e.target.value)}
+                                                    disabled={selectedInvoice.status !== 'pending'}
+                                                    className="w-full bg-transparent border border-card-border rounded px-2 py-1 text-sm focus:border-primary disabled:opacity-50"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-xs">Amount (LKR)</label>
+                                                <input
+                                                    type="number"
+                                                    value={payment.amount}
+                                                    onChange={e => handleExtraPaymentChange(idx, 'amount', Number(e.target.value))}
+                                                    disabled={selectedInvoice.status !== 'pending'}
+                                                    className="w-full bg-transparent border border-card-border rounded px-2 py-1 text-sm focus:border-primary disabled:opacity-50"
+                                                />
+                                            </div>
+                                            {selectedInvoice.status === 'pending' && (
+                                                <button
+                                                    onClick={() => handleRemoveExtraPayment(idx)}
+                                                    className="btn bg-red-50 text-red-600 border-red-200 px-3 py-1.5 mb-0.5"
+                                                    title="Remove"
+                                                >
+                                                    🗑️
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="text-center text-secondary text-sm mb-4">No additional payments.</div>
+                            )}
+                        </>
 
                         <div className="mt-8 flex justify-end gap-4 pt-6 border-t border-card-border">
                             <button onClick={closeDetails} className="btn btn-secondary">Close Window</button>

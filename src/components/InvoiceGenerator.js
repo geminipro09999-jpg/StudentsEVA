@@ -23,6 +23,7 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
     const [isSubmitted, setIsSubmitted] = useState(false);
     const [invoiceType, setInvoiceType] = useState('timesheet');
     const [paymentBasis, setPaymentBasis] = useState('hourly');
+    const [extraPayments, setExtraPayments] = useState([]);
 
 
     const lecturerMap = useMemo(() => {
@@ -121,7 +122,9 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
         return years;
     }, [entries]);
 
-    const grossTotal = existingInvoice ? Number(existingInvoice.amount || 0) : calculatedGross;
+    const baseTotal = calculatedGross;
+    const extraPaymentsTotal = extraPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+    const grossTotal = baseTotal + extraPaymentsTotal;
     const activeDeduction = existingInvoice ? Number(existingInvoice.deductions || 0) : 0;
     const finalTotal = grossTotal - activeDeduction;
 
@@ -131,6 +134,7 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
         setSelectedYear(String(inv.year));
         if (initialIsAdmin && inv.user_id) setSelectedLecturer(inv.user_id);
         setInvoiceDescription(inv.invoice_data?.description || '');
+        setExtraPayments(inv.invoice_data?.extraPayments || []);
 
         toast.success(`Loaded data for ${inv.month} ${inv.year}. Scroll down to preview/download.`);
     };
@@ -144,8 +148,9 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
         const freshTotalHours = rawFilteredEntries.reduce((s, e) => s + Number(e.hours), 0);
         const freshRate = Number(manualRate) || (freshIsFixed ? (lecturerInfo?.monthly_salary || 0) : (lecturerInfo?.hourly_rate || 3000));
         const freshGross = freshIsFixed ? freshRate : (freshTotalHours * freshRate);
+        const freshExtraPaymentsTotal = extraPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
         const freshDeduction = existingInvoice ? Number(existingInvoice.deductions || 0) : 0;
-        const freshFinalTotal = freshGross - freshDeduction;
+        const freshFinalTotal = freshGross + freshExtraPaymentsTotal - freshDeduction;
         const freshPaymentUnit = freshIsFixed ? 'month' : (lecturerInfo?.payment_unit || 'hour');
 
         const res = await submitInvoice({
@@ -163,7 +168,8 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
             lecturerName: lecturerInfo?.name,
             lecturerEmail: lecturerInfo?.staff_email || lecturerInfo?.email,
             invoiceType: activeBasis === 'monthly' ? 'fixed' : 'timesheet',
-            description: activeDescription
+            description: activeDescription,
+            extraPayments: extraPayments
         });
 
         if (res.success) {
@@ -199,7 +205,7 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
             doc.text('INVOICE', 105, 30, { align: 'center' });
 
             // 2. Personal Info (Top Left)
-            doc.setFontSize(11);
+            doc.setFontSize(12);
             doc.setTextColor(0, 0, 0);
             doc.setFont('helvetica', 'bold');
             doc.text(`${lecturerInfo?.name || 'Your Name'}`, 20, 50);
@@ -214,28 +220,18 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
 
             doc.text([
                 ...combinedLines,
-                `Email: ${lecturerInfo?.staff_email || lecturerInfo?.email}`
-            ], 20, 58);
+                `Email: ${lecturerInfo?.staff_email || lecturerInfo?.email}`,
+                `Invoice No: ${displayInvoiceNo}`,
+                `Date: 15/${String(selectedMonth).padStart(2, '0')}/${selectedYear}`
+            ], 20, 55);
 
-            // 3. Invoice Meta (Top Right)
-            doc.setFont('helvetica', 'bold');
-            doc.text(`Invoice No:`, 140, 58);
-            doc.text(`Date:`, 140, 72);
-
-            doc.setFont('helvetica', 'normal');
-            doc.text(displayInvoiceNo, 175, 58);
-            doc.text(`15/${String(selectedMonth).padStart(2, '0')}/${selectedYear}`, 175, 72);
-
-            // 4. Client Info (Middle Left)
-            doc.setFont('helvetica', 'bold');
-            doc.text('Unicom TIC', 20, 95);
-            doc.setFont('helvetica', 'normal');
+            // 3. Client Info (Top Right)
             doc.text([
-                'unicomtic, MPCS Building,',
-                '127 kks road jaffna',
-                '',
+                'Unicom TIC',
+                'MPCS Building, 127 KKS Road',
+                'Jaffna',
                 'unicomtic@gmail.com'
-            ], 20, 102);
+            ], 140, 50);
 
             const isMonthly = activeBasis === 'monthly';
             const headSummary = isMonthly 
@@ -243,16 +239,24 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
                 : [['Description', 'Unit', 'Rate per Unit', 'Total - LKR']];
             
             const bodySummary = isMonthly
-                ? [[activeDescription, grossTotal.toLocaleString()]]
+                ? [[activeDescription, baseTotal.toLocaleString()]]
                 : [[
                     activeDescription,
                     `${displayUnit} ${unitLabel}`,
                     activeRate.toLocaleString(),
-                    grossTotal.toLocaleString()
+                    baseTotal.toLocaleString()
                   ]];
 
+            extraPayments.forEach(payment => {
+                if (isMonthly) {
+                    bodySummary.push([payment.description, Number(payment.amount).toLocaleString()]);
+                } else {
+                    bodySummary.push([payment.description, '-', '-', Number(payment.amount).toLocaleString()]);
+                }
+            });
+
             autoTable(doc, {
-                startY: 125,
+                startY: 85,
                 head: headSummary,
                 body: bodySummary,
                 theme: 'grid',
@@ -355,15 +359,31 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
                         activeDescription,
                         `${displayUnit} ${unitLabel}`,
                         activeRate.toLocaleString(),
-                        grossTotal.toLocaleString(),
+                        baseTotal.toLocaleString(),
                     ].map((val, ci) =>
                         new TableCell({
-                            children: [new Paragraph({ children: [new TextRun({ text: val, size: 18 })], alignment: ci === 0 ? AlignmentType.LEFT : (ci === 1 ? AlignmentType.CENTER : AlignmentType.RIGHT) })],
+                            children: [new Paragraph({ children: [new TextRun({ text: String(val), size: 18 })], alignment: ci === 0 ? AlignmentType.LEFT : (ci === 1 ? AlignmentType.CENTER : AlignmentType.RIGHT) })],
                             borders: headerBorder,
                         })
                     ),
                 })
             ];
+
+            extraPayments.forEach(payment => {
+                tableRows.push(new TableRow({
+                    children: [
+                        payment.description,
+                        '-',
+                        '-',
+                        Number(payment.amount).toLocaleString(),
+                    ].map((val, ci) =>
+                        new TableCell({
+                            children: [new Paragraph({ children: [new TextRun({ text: String(val), size: 18 })], alignment: ci === 0 ? AlignmentType.LEFT : (ci === 1 ? AlignmentType.CENTER : AlignmentType.RIGHT) })],
+                            borders: headerBorder,
+                        })
+                    ),
+                }));
+            });
 
             const doc = new Document({
                 sections: [{
@@ -380,7 +400,7 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
                         new Paragraph({ children: [new TextRun({ text: `Generated: ${new Date().toLocaleDateString()}`, size: 18, color: '999999' })], spacing: { after: 300 } }),
                         new Table({ rows: tableRows, width: { size: 100, type: WidthType.PERCENTAGE } }),
                         new Paragraph({ text: '', spacing: { before: 200 } }),
-                        new Paragraph({ children: [new TextRun({ text: `Payment Rate: ${activeRate.toLocaleString()} LKR per ${currentUnit}`, bold: true, size: 18 })] }),
+                        new Paragraph({ children: [new TextRun({ text: `Payment Rate: ${activeRate.toLocaleString()} LKR per ${unitLabel}`, bold: true, size: 18 })] }),
                         new Paragraph({ text: '', spacing: { before: 400 } }),
                         new Paragraph({ children: [new TextRun({ text: '____________________________                                              ____________________________', size: 20 })], spacing: { before: 400 } }),
                         new Paragraph({ children: [new TextRun({ text: '      Signature                                                                   Admin Signature', size: 18, color: '666666' })] }),
@@ -540,6 +560,61 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
                 </div>
             </div>
 
+            {/* Extra Payments */}
+            {initialIsAdmin && (
+                <div className="glass-card mb-4" style={{ padding: '1.25rem' }}>
+                    <div className="flex justify-between items-center mb-4">
+                        <h4 className="font-bold">Additional Payments</h4>
+                        <button 
+                            className="btn btn-secondary px-3 py-1 text-sm"
+                            onClick={() => setExtraPayments([...extraPayments, { id: Date.now(), description: 'Study Material Preparation', amount: 0 }])}
+                        >
+                            + Add Item
+                        </button>
+                    </div>
+                    {extraPayments.length > 0 && (
+                        <div className="flex flex-col gap-3">
+                            {extraPayments.map((payment, index) => (
+                                <div key={payment.id} className="flex gap-4 items-end">
+                                    <div className="flex-1">
+                                        <label className="text-sm">Description</label>
+                                        <input 
+                                            type="text" 
+                                            value={payment.description} 
+                                            onChange={e => {
+                                                const newPayments = [...extraPayments];
+                                                newPayments[index].description = e.target.value;
+                                                setExtraPayments(newPayments);
+                                            }}
+                                            className="w-full bg-transparent border border-card-border rounded px-2 py-1"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-sm">Amount (LKR)</label>
+                                        <input 
+                                            type="number" 
+                                            value={payment.amount} 
+                                            onChange={e => {
+                                                const newPayments = [...extraPayments];
+                                                newPayments[index].amount = Number(e.target.value);
+                                                setExtraPayments(newPayments);
+                                            }}
+                                            className="w-full bg-transparent border border-card-border rounded px-2 py-1"
+                                        />
+                                    </div>
+                                    <button 
+                                        className="btn bg-red-50 text-red-600 border-red-200 px-3 py-2 mb-1"
+                                        onClick={() => setExtraPayments(extraPayments.filter(p => p.id !== payment.id))}
+                                    >
+                                        🗑️
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+
             {/* Invoice Preview */}
             {!selectedLecturer ? (
                 <div className="glass-card text-center" style={{ padding: '3rem', color: 'var(--text-secondary)' }}>
@@ -627,8 +702,16 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
                                     <td style={{ padding: '8px' }}>{activeDescription}</td>
                                     {!isFixedInvoice && <td style={{ textAlign: 'center', padding: '8px' }}>{displayUnit} {unitLabel}</td>}
                                     {!isFixedInvoice && <td style={{ textAlign: 'right', padding: '8px' }}>{activeRate.toLocaleString()}</td>}
-                                    <td style={{ textAlign: 'right', padding: '8px' }}>{grossTotal.toLocaleString()}</td>
+                                    <td style={{ textAlign: 'right', padding: '8px' }}>{baseTotal.toLocaleString()}</td>
                                 </tr>
+                                {extraPayments.map(payment => (
+                                    <tr key={payment.id}>
+                                        <td style={{ padding: '8px' }}>{payment.description}</td>
+                                        {!isFixedInvoice && <td style={{ textAlign: 'center', padding: '8px' }}>-</td>}
+                                        {!isFixedInvoice && <td style={{ textAlign: 'right', padding: '8px' }}>-</td>}
+                                        <td style={{ textAlign: 'right', padding: '8px' }}>{Number(payment.amount).toLocaleString()}</td>
+                                    </tr>
+                                ))}
                             </tbody>
                         </table>
                     </div>
