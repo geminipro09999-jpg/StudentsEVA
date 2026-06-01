@@ -36,30 +36,56 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
     const userRoles = lecturerInfo?.roles || [lecturerInfo?.role] || [];
     const isLecturerRole = userRoles.includes('lecturer');
     const isStaffRole = userRoles.includes('incubator_staff');
+    const isLabAssistant = userRoles.some(r => r && r.startsWith('lab_assistant'));
     const initialIsAdminAccount = userRoles.some(r => ['admin', 'administrator'].includes(r));
 
     const monthName = MONTH_NAMES[Number(selectedMonth)] || '';
     const periodLabel = `${monthName} ${selectedYear}`;
-    const dbInvoiceNo = `INV-${selectedYear}${String(selectedMonth).padStart(2, '0')}-${(selectedLecturer || '').slice(0, 6).toUpperCase()}`;
+    const invoiceTypeSuffix = paymentBasis === 'monthly' ? 'F' : 'T';
+    const dbInvoiceNo = `INV-${selectedYear}${String(selectedMonth).padStart(2, '0')}-${(selectedLecturer || '').slice(0, 6).toUpperCase()}-${invoiceTypeSuffix}`;
 
     const existingInvoice = useMemo(() => {
+        const expectedInvoiceType = paymentBasis === 'monthly' ? 'fixed' : 'timesheet';
         return invoices.find(inv =>
             inv.month === monthName &&
             inv.year === selectedYear &&
-            (initialIsAdmin ? inv.user_id === selectedLecturer : true)
+            (initialIsAdmin ? inv.user_id === selectedLecturer : true) &&
+            inv.invoice_data?.invoiceType === expectedInvoiceType
         );
-    }, [invoices, monthName, selectedYear, selectedLecturer, initialIsAdmin]);
+    }, [invoices, monthName, selectedYear, selectedLecturer, initialIsAdmin, paymentBasis]);
 
     const displayInvoiceNo = useMemo(() => {
         if (existingInvoice?.invoice_data?.displayInvoiceNo) {
             return String(existingInvoice.invoice_data.displayInvoiceNo);
         }
         if (!selectedLecturer) return '10000';
-        const userInvoices = [...invoices].filter(inv => inv.user_id === selectedLecturer)
+
+        const userInvoicesThisYear = [...invoices].filter(inv => inv.user_id === selectedLecturer && inv.year === selectedYear)
             .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-        const existingIdx = userInvoices.findIndex(inv => inv.month === monthName && inv.year === selectedYear);
-        return existingIdx !== -1 ? String(10000 + existingIdx) : String(10000 + userInvoices.length);
-    }, [existingInvoice, invoices, selectedLecturer, monthName, selectedYear]);
+        
+        const existingIdxThisYear = userInvoicesThisYear.findIndex(inv => inv.month === monthName);
+
+        if (isStaffRole) {
+            // Incubator Staff logic: based on month index
+            let monthIdx = Number(selectedMonth);
+            
+            // Kunasika specific logic: March -> 0001
+            const isKunasika = lecturerInfo?.name?.toLowerCase().includes('kunasika');
+            if (isKunasika) {
+                // If it's Jan or Feb, just use 0000 or negative, or clamp it. 
+                // The requirement says "start ONLY from March". 
+                monthIdx = Math.max(1, monthIdx - 2); 
+            }
+            return String(monthIdx).padStart(4, '0');
+        }
+
+        // Lab Assistants and others
+        const allUserInvoices = [...invoices].filter(inv => inv.user_id === selectedLecturer)
+            .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+        const existingIdxTotal = allUserInvoices.findIndex(inv => inv.month === monthName && inv.year === selectedYear);
+        
+        return existingIdxTotal !== -1 ? String(10000 + existingIdxTotal) : String(10000 + allUserInvoices.length);
+    }, [existingInvoice, invoices, selectedLecturer, monthName, selectedYear, isStaffRole, lecturerInfo, selectedMonth]);
 
     // Auto-set default basis based on user settings when lecturer changes
     useEffect(() => {
@@ -68,9 +94,9 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
             if (methods.length > 0) {
                 setPaymentBasis(methods[0]);
             } else {
-                if (isStaffRole) setPaymentBasis('monthly');
+                if (isStaffRole || userRoles.includes('lab_assistant_fixed')) setPaymentBasis('monthly');
                 else if (userRoles.includes('lecturer')) setPaymentBasis('unit');
-                else if (userRoles.includes('lecturer_hourly')) setPaymentBasis('hourly');
+                else if (userRoles.includes('lecturer_hourly') || userRoles.includes('lab_assistant_hourly')) setPaymentBasis('hourly');
                 else setPaymentBasis('unit');
             }
         } else if (existingInvoice) {

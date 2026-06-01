@@ -12,6 +12,7 @@ export default function UsersPage() {
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+    const [searchQuery, setSearchQuery] = useState("");
     const [selectedUser, setSelectedUser] = useState(null);
     const [editingRolesUser, setEditingRolesUser] = useState(null);
     const [editingNameUser, setEditingNameUser] = useState(null);
@@ -66,6 +67,16 @@ export default function UsersPage() {
                     </div>
                 )}
 
+                <div className="mb-4 flex">
+                    <input 
+                        type="text" 
+                        placeholder="Search users by name, email, or role..." 
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="bg-transparent border border-card-border rounded-lg px-4 py-2 w-full max-w-md focus:border-primary focus:outline-none"
+                    />
+                </div>
+
                 <div className="glass-card">
                     <div style={{ overflowX: 'auto' }}>
                         <table className="data-table">
@@ -79,7 +90,14 @@ export default function UsersPage() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {users.map(u => (
+                                {users.filter(u => {
+                                    if (!searchQuery) return true;
+                                    const q = searchQuery.toLowerCase();
+                                    const roleMatch = (u.roles || [u.role]).some(r => r && r.toLowerCase().includes(q));
+                                    return (u.name && u.name.toLowerCase().includes(q)) || 
+                                           (u.email && u.email.toLowerCase().includes(q)) || 
+                                           roleMatch;
+                                }).map(u => (
                                     <tr key={u.id}>
                                         <td style={{ fontWeight: '500' }}>{u.name}</td>
                                         <td>{u.email}</td>

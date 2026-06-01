@@ -15,6 +15,7 @@ export const authOptions = {
                 if (!credentials?.email || !credentials?.password) {
                     return null;
                 }
+                console.log("🔐 Login attempt for email:", credentials.email);
                 try {
                     const { data: user, error } = await supabase
                         .from('users')

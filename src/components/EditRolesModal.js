@@ -26,14 +26,14 @@ export default function EditRolesModal({ user, onClose }) {
             
             // Auto-tick appropriate payment methods if it's a new setup
             if (role === 'lecturer') setPaymentMethods(prev => Array.from(new Set([...prev, 'unit'])));
-            if (role === 'lecturer_hourly') setPaymentMethods(prev => Array.from(new Set([...prev, 'hourly'])));
-            if (role === 'incubator_staff') setPaymentMethods(prev => Array.from(new Set([...prev, 'monthly'])));
+            if (role === 'lecturer_hourly' || role === 'lab_assistant_hourly') setPaymentMethods(prev => Array.from(new Set([...prev, 'hourly'])));
+            if (role === 'incubator_staff' || role === 'lab_assistant_fixed') setPaymentMethods(prev => Array.from(new Set([...prev, 'monthly'])));
         }
     };
 
-    const showHourly = selectedRoles.includes('lecturer_hourly') || selectedRoles.includes('admin');
+    const showHourly = selectedRoles.includes('lecturer_hourly') || selectedRoles.includes('lab_assistant_hourly') || selectedRoles.includes('admin');
     const showUnit = selectedRoles.includes('lecturer') || selectedRoles.includes('admin');
-    const showMonthly = selectedRoles.includes('incubator_staff') || selectedRoles.includes('admin');
+    const showMonthly = selectedRoles.includes('incubator_staff') || selectedRoles.includes('lab_assistant_fixed') || selectedRoles.includes('admin');
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -58,6 +58,8 @@ export default function EditRolesModal({ user, onClose }) {
         { key: 'lecturer_hourly', label: 'Lecturer* (Hourly)', sublabel: 'Paid per hour logged', color: 'var(--warning)', borderActive: 'var(--warning)', bgActive: 'rgba(245,158,11,0.06)' },
         { key: 'admin', label: 'Administrator', sublabel: 'Full system access', color: 'var(--danger)', borderActive: 'var(--danger)', bgActive: 'rgba(239,68,68,0.06)' },
         { key: 'incubator_staff', label: 'Incubator Staff (Monthly)', sublabel: 'Fixed monthly salary', color: 'var(--success)', borderActive: 'var(--success)', bgActive: 'rgba(34,197,94,0.06)' },
+        { key: 'lab_assistant_fixed', label: 'Lab Assistant (Fixed)', sublabel: 'Fixed monthly salary', color: '#8b5cf6', borderActive: '#8b5cf6', bgActive: 'rgba(139,92,246,0.06)' },
+        { key: 'lab_assistant_hourly', label: 'Lab Assistant (Hourly)', sublabel: 'Paid per hour logged', color: '#14b8a6', borderActive: '#14b8a6', bgActive: 'rgba(20,184,166,0.06)' },
     ];
 
     return (

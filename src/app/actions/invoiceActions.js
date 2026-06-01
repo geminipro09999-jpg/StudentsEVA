@@ -14,13 +14,14 @@ export async function submitInvoice(invoiceData) {
 
         const targetUserId = invoiceData.lecturer_id || session.user.id;
 
-        // Check if invoice already exists for this user+month+year
+        // Check if invoice already exists for this user+month+year AND same invoice type
         const { data: existing } = await supabase
             .from('invoices')
             .select('id, status')
             .eq('user_id', targetUserId)
             .eq('month', invoiceData.month)
             .eq('year', invoiceData.year)
+            .eq('invoice_data->>invoiceType', invoiceData.invoiceType)
             .maybeSingle();
 
         let error;

@@ -25,7 +25,12 @@ export default function AdminInvoicesPage() {
     const [ratesMap, setRatesMap] = useState({});
     const [invoiceNosMap, setInvoiceNosMap] = useState({});
     const [datesMap, setDatesMap] = useState({});
-    const [paymentBasisFilter, setPaymentBasisFilter] = useState("all");
+    const [viewMode, setViewMode] = useState("review"); // 'review' or 'monthly'
+    const [staffTypeFilter, setStaffTypeFilter] = useState("all"); // 'all', 'incubator', 'lab_assistant', 'lecturer'
+    const [monthFilter, setMonthFilter] = useState("all");
+    const [nameFilter, setNameFilter] = useState("");
+    const [statusFilter, setStatusFilter] = useState("all");
+    const [displayLimit, setDisplayLimit] = useState(30);
 
     const { data: session, status } = useSession();
     const router = useRouter();
@@ -54,7 +59,13 @@ export default function AdminInvoicesPage() {
 
             if (error) throw error;
 
-            setInvoices(data || []);
+            const sortedByStatusAndDate = (data || []).sort((a, b) => {
+                if (a.status === 'approved' && b.status !== 'approved') return -1;
+                if (a.status !== 'approved' && b.status === 'approved') return 1;
+                return new Date(b.created_at) - new Date(a.created_at);
+            });
+
+            setInvoices(sortedByStatusAndDate);
             const dMap = {};
             const bMap = {};
             const descMap = {};
@@ -416,32 +427,99 @@ export default function AdminInvoicesPage() {
 
             {error && <div className="alert alert-danger mb-6">{error}</div>}
 
-            <div className="flex flex-wrap gap-2 mb-6">
-                <button 
-                    onClick={() => setPaymentBasisFilter('all')} 
-                    className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${paymentBasisFilter === 'all' ? 'bg-primary text-white shadow-lg' : 'bg-secondary/10 text-secondary hover:bg-secondary/20'}`}
-                >
-                    ALL INVOICES
-                </button>
-                <button 
-                    onClick={() => setPaymentBasisFilter('hourly')} 
-                    className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${paymentBasisFilter === 'hourly' ? 'bg-warning text-white shadow-lg' : 'bg-warning/10 text-warning hover:bg-warning/20'}`}
-                >
-                    HOURLY (Lecturer*)
-                </button>
-                <button 
-                    onClick={() => setPaymentBasisFilter('unit')} 
-                    className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${paymentBasisFilter === 'unit' ? 'bg-accent text-white shadow-lg' : 'bg-accent/10 text-accent hover:bg-accent/20'}`}
-                >
-                    PER DAY (Lecturer)
-                </button>
-                <button 
-                    onClick={() => setPaymentBasisFilter('monthly')} 
-                    className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${paymentBasisFilter === 'monthly' ? 'bg-success text-white shadow-lg' : 'bg-success/10 text-success hover:bg-success/20'}`}
-                >
-                    MONTHLY (Incubator)
-                </button>
+            <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
+                <div className="flex bg-secondary/10 p-1 rounded-xl">
+                    <button 
+                        onClick={() => { setViewMode('review'); setStatusFilter('all'); setMonthFilter('all'); }} 
+                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'review' ? 'bg-white shadow text-primary' : 'text-secondary hover:text-primary'}`}
+                    >
+                        Inbox / Review
+                    </button>
+                    <button 
+                        onClick={() => { setViewMode('monthly'); setStatusFilter('approved'); setMonthFilter(MONTH_NAMES[new Date().getMonth() + 1] || 'January'); }} 
+                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'monthly' ? 'bg-white shadow text-primary' : 'text-secondary hover:text-primary'}`}
+                    >
+                        Monthly Approvals
+                    </button>
+                </div>
+                
+                <div className="flex flex-wrap gap-2 items-center">
+                    <input 
+                        type="text" 
+                        placeholder="Filter by Name..." 
+                        value={nameFilter} 
+                        onChange={(e) => setNameFilter(e.target.value)} 
+                        className="bg-transparent border border-card-border rounded px-3 py-2 text-sm focus:border-primary max-w-[200px]"
+                    />
+                    {viewMode === 'review' && (
+                        <>
+                            <select 
+                                value={monthFilter} 
+                                onChange={(e) => setMonthFilter(e.target.value)} 
+                                className="bg-transparent border border-card-border rounded px-3 py-2 text-sm focus:border-primary max-w-[150px]"
+                            >
+                                <option value="all">All Months</option>
+                                {MONTH_NAMES.filter(m => m).map(m => (
+                                    <option key={m} value={m}>{m}</option>
+                                ))}
+                            </select>
+                            <select 
+                                value={statusFilter} 
+                                onChange={(e) => setStatusFilter(e.target.value)} 
+                                className="bg-transparent border border-card-border rounded px-3 py-2 text-sm focus:border-primary max-w-[150px]"
+                            >
+                                <option value="all">All Status</option>
+                                <option value="pending">Pending</option>
+                                <option value="approved">Approved</option>
+                                <option value="rejected">Rejected</option>
+                            </select>
+                        </>
+                    )}
+                </div>
             </div>
+
+            {viewMode === 'review' && (
+                <div className="flex flex-wrap gap-2 mb-6">
+                    <button 
+                        onClick={() => setStaffTypeFilter('all')} 
+                        className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${staffTypeFilter === 'all' ? 'bg-primary text-white shadow-lg' : 'bg-secondary/10 text-secondary hover:bg-secondary/20'}`}
+                    >
+                        ALL STAFF
+                    </button>
+                    <button 
+                        onClick={() => setStaffTypeFilter('incubator_staff')} 
+                        className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${staffTypeFilter === 'incubator_staff' ? 'bg-success text-white shadow-lg' : 'bg-success/10 text-success hover:bg-success/20'}`}
+                    >
+                        INCUBATOR STAFF
+                    </button>
+                    <button 
+                        onClick={() => setStaffTypeFilter('lab_assistant')} 
+                        className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${staffTypeFilter === 'lab_assistant' ? 'bg-accent text-white shadow-lg' : 'bg-accent/10 text-accent hover:bg-accent/20'}`}
+                    >
+                        LAB ASSISTANTS
+                    </button>
+                    <button 
+                        onClick={() => setStaffTypeFilter('lecturer')} 
+                        className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${staffTypeFilter === 'lecturer' ? 'bg-warning text-white shadow-lg' : 'bg-warning/10 text-warning hover:bg-warning/20'}`}
+                    >
+                        LECTURERS
+                    </button>
+                </div>
+            )}
+
+            {viewMode === 'monthly' && (
+                <div className="flex flex-wrap gap-2 mb-6 p-3 bg-secondary/5 rounded-xl border border-card-border">
+                    {MONTH_NAMES.filter(m => m).map(m => (
+                        <button 
+                            key={m}
+                            onClick={() => setMonthFilter(m)} 
+                            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${monthFilter === m ? 'bg-primary text-white shadow' : 'bg-transparent text-secondary hover:bg-secondary/10'}`}
+                        >
+                            {m} Approvals
+                        </button>
+                    ))}
+                </div>
+            )}
 
             <div className="glass-card">
                 <div style={{ overflowX: 'auto' }}>
@@ -464,135 +542,149 @@ export default function AdminInvoicesPage() {
                                     <td colSpan="8" className="text-center py-8 text-secondary">No invoices submitted for review yet.</td>
                                 </tr>
                             ) : (
-                                invoices.filter(inv => {
-                                    const b = inv.invoice_data?.paymentBasis || (inv.invoice_data?.invoiceType === 'fixed' ? 'monthly' : 'hourly');
-                                    if (paymentBasisFilter === 'all') return true;
-                                    return b === paymentBasisFilter;
-                                }).map(inv => (
-                                    <tr key={inv.id}>
-                                        <td>
-                                            <div className="font-bold">{inv.users?.name}</div>
-                                            <div className="text-xs text-secondary">{inv.users?.staff_email || inv.users?.email}</div>
-                                        </td>
-                                        <td>{inv.month} {inv.year}</td>
-                                        <td>
-                                            <input
-                                                type="text"
-                                                value={invoiceNosMap[inv.id] || ''}
-                                                onChange={(e) => setInvoiceNosMap({...invoiceNosMap, [inv.id]: e.target.value})}
-                                                disabled={inv.status !== 'pending' || updatingId === inv.id}
-                                                className="table-input font-mono text-xs"
-                                                style={{ width: '80px', padding: '0.2rem 0.5rem' }}
-                                            />
-                                        </td>
-                                        <td>
-                                            <input
-                                                type="number"
-                                                value={baseAmtMap[inv.id] || 0}
-                                                onChange={(e) => handleBaseAmtChange(inv.id, e.target.value)}
-                                                disabled={inv.status !== 'pending' || updatingId === inv.id}
-                                                className="table-input"
-                                                style={{ width: '120px', padding: '0.2rem 0.5rem', fontSize: '0.9rem', fontWeight: 'bold' }}
-                                            />
-                                        </td>
-                                        <td>
-                                            <input
-                                                type="number"
-                                                value={deductionsMap[inv.id] || 0}
-                                                onChange={(e) => handleDeductionChange(inv.id, e.target.value)}
-                                                disabled={inv.status !== 'pending' || updatingId === inv.id}
-                                                className="table-input"
-                                                style={{ width: '100px', padding: '0.2rem 0.5rem', fontSize: '0.9rem' }}
-                                            />
-                                        </td>
-                                        <td className="font-bold">
-                                            LKR {((baseAmtMap[inv.id] || 0) - (deductionsMap[inv.id] || 0)).toLocaleString()}
-                                        </td>
-                                        <td>
-                                            <span className={`badge ${inv.status === 'approved' ? 'badge-success' : inv.status === 'rejected' ? 'badge-danger' : 'badge-warning'}`}>
-                                                {inv.status.toUpperCase()}
-                                            </span>
-                                            <span className="badge badge-secondary ml-2" style={{ background: 'rgba(99, 102, 241, 0.1)', color: 'var(--accent-color)' }}>
-                                                {(() => {
-                                                    const basis = inv.invoice_data?.paymentBasis || (inv.invoice_data?.invoiceType === 'fixed' ? 'monthly' : 'hourly');
-                                                    if (basis === 'hourly') return 'LECTURER *';
-                                                    if (basis === 'unit') return 'PER DAY';
-                                                    return basis.toUpperCase();
-                                                })()}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <div className="flex gap-2">
-                                                {inv.status === 'pending' && (
-                                                    <>
-                                                        <button
-                                                            onClick={() => handleApprove(inv.id)}
-                                                            disabled={updatingId === inv.id}
-                                                            className="btn btn-primary px-3 py-1 text-xs"
-                                                            style={{ background: '#10b981' }}
+                                (() => {
+                                    const filteredInvoices = invoices.filter(inv => {
+                                        if (viewMode === 'monthly') {
+                                            if (inv.status !== 'approved') return false;
+                                            if (monthFilter !== 'all' && inv.month !== monthFilter) return false;
+                                        } else {
+                                            const userRoles = inv.users?.roles || [inv.users?.role] || [];
+                                            const isIncubator = userRoles.includes('incubator_staff');
+                                            const isLabAssistant = userRoles.some(r => r && r.startsWith('lab_assistant'));
+                                            const isLecturer = userRoles.includes('lecturer') || userRoles.includes('lecturer_hourly');
+
+                                            if (staffTypeFilter === 'incubator_staff' && !isIncubator) return false;
+                                            if (staffTypeFilter === 'lab_assistant' && !isLabAssistant) return false;
+                                            if (staffTypeFilter === 'lecturer' && !isLecturer) return false;
+                                            
+                                            if (monthFilter !== 'all' && inv.month !== monthFilter) return false;
+                                            if (statusFilter !== 'all' && inv.status !== statusFilter) return false;
+                                        }
+
+                                        if (nameFilter && !inv.users?.name?.toLowerCase().includes(nameFilter.toLowerCase())) return false;
+
+                                        return true;
+                                    });
+                                    
+                                    const displayedInvoices = filteredInvoices.slice(0, displayLimit);
+                                    
+                                    return (
+                                        <>
+                                            {displayedInvoices.map(inv => (
+                                                <tr key={inv.id}>
+                                                    <td>
+                                                        <div className="font-bold">{inv.users?.name}</div>
+                                                        <div className="text-xs text-secondary">{inv.users?.staff_email || inv.users?.email}</div>
+                                                    </td>
+                                                    <td>{inv.month} {inv.year}</td>
+                                                    <td>
+                                                        <input
+                                                            type="text"
+                                                            value={invoiceNosMap[inv.id] || ''}
+                                                            onChange={(e) => setInvoiceNosMap({...invoiceNosMap, [inv.id]: e.target.value})}
+                                                            disabled={inv.status !== 'pending' || updatingId === inv.id}
+                                                            className="table-input font-mono text-xs"
+                                                            style={{ width: '80px', padding: '0.2rem 0.5rem' }}
+                                                        />
+                                                    </td>
+                                                    <td>
+                                                        <input
+                                                            type="number"
+                                                            value={baseAmtMap[inv.id] || 0}
+                                                            onChange={(e) => handleBaseAmtChange(inv.id, e.target.value)}
+                                                            disabled={inv.status !== 'pending' || updatingId === inv.id}
+                                                            className="table-input"
+                                                            style={{ width: '120px', padding: '0.2rem 0.5rem', fontSize: '0.9rem', fontWeight: 'bold' }}
+                                                        />
+                                                    </td>
+                                                    <td>
+                                                        <input
+                                                            type="number"
+                                                            value={deductionsMap[inv.id] || 0}
+                                                            onChange={(e) => handleDeductionChange(inv.id, e.target.value)}
+                                                            disabled={inv.status !== 'pending' || updatingId === inv.id}
+                                                            className="table-input"
+                                                            style={{ width: '100px', padding: '0.2rem 0.5rem', fontSize: '0.9rem' }}
+                                                        />
+                                                    </td>
+                                                    <td className="font-bold">
+                                                        LKR {((baseAmtMap[inv.id] || 0) - (deductionsMap[inv.id] || 0)).toLocaleString()}
+                                                    </td>
+                                                    <td>
+                                                        <span className={`badge ${inv.status === 'approved' ? 'badge-success' : inv.status === 'rejected' ? 'badge-danger' : 'badge-warning'}`}>
+                                                            {inv.status.toUpperCase()}
+                                                        </span>
+                                                        <span className="badge badge-secondary ml-2" style={{ background: 'rgba(99, 102, 241, 0.1)', color: 'var(--accent-color)' }}>
+                                                            {(() => {
+                                                                const basis = inv.invoice_data?.paymentBasis || (inv.invoice_data?.invoiceType === 'fixed' ? 'monthly' : 'hourly');
+                                                                if (basis === 'hourly') return 'LECTURER *';
+                                                                if (basis === 'unit') return 'PER DAY';
+                                                                return basis.toUpperCase();
+                                                            })()}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <div className="flex gap-2">
+                                                            {inv.status === 'pending' && (
+                                                                <>
+                                                                    <button
+                                                                        onClick={() => handleApprove(inv.id)}
+                                                                        disabled={updatingId === inv.id}
+                                                                        className="btn btn-primary px-3 py-1 text-xs"
+                                                                        style={{ background: '#10b981' }}
+                                                                    >
+                                                                        {updatingId === inv.id ? "..." : "Approve"}
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handleReject(inv.id)}
+                                                                        disabled={updatingId === inv.id}
+                                                                        className="btn btn-secondary px-3 py-1 text-xs"
+                                                                        style={{ background: '#ef4444' }}
+                                                                    >
+                                                                        Reject
+                                                                    </button>
+                                                                </>
+                                                            )}
+                                                            <button
+                                                                onClick={() => openDetails(inv)}
+                                                                className="btn btn-primary px-3 py-1 text-xs"
+                                                                title="Edit & Download PDF"
+                                                            >
+                                                                ✏️ Edit
+                                                            </button>
+                                                            <button
+                                                                onClick={() => exportPDF(inv, true)}
+                                                                className="btn btn-secondary px-3 py-1 text-xs"
+                                                                title="Preview PDF in Browser"
+                                                            >
+                                                                👁️ Preview
+                                                            </button>
+                                                            <button
+                                                                onClick={() => exportPDF(inv, false)}
+                                                                className="btn btn-secondary px-3 py-1 text-xs"
+                                                                title="Download PDF"
+                                                            >
+                                                                📄
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                            {filteredInvoices.length > displayLimit && (
+                                                <tr>
+                                                    <td colSpan="8" className="text-center py-6">
+                                                        <button 
+                                                            onClick={() => setDisplayLimit(prev => prev + 30)}
+                                                            className="btn btn-secondary px-6 py-2 rounded-full font-bold shadow-sm hover:shadow transition-all"
                                                         >
-                                                            {updatingId === inv.id ? "..." : "Approve"}
+                                                            Load More Invoices ({filteredInvoices.length - displayLimit} remaining)
                                                         </button>
-                                                        <button
-                                                            onClick={() => handleReject(inv.id)}
-                                                            disabled={updatingId === inv.id}
-                                                            className="btn btn-secondary px-3 py-1 text-xs"
-                                                            style={{ background: '#ef4444' }}
-                                                        >
-                                                            Reject
-                                                        </button>
-                                                    </>
-                                                )}
-                                                {(inv.status === 'approved' || inv.status === 'rejected') && (
-                                                    <button
-                                                        onClick={async () => {
-                                                            if (!confirm("Are you sure you want to Re-Open this invoice? It will become 'Pending' again for edits.")) return;
-                                                            setUpdatingId(inv.id);
-                                                            const res = await approveInvoice(inv.id, {
-                                                                status: 'pending',
-                                                                amount: Number(baseAmtMap[inv.id] || 0),
-                                                                deductions: Number(deductionsMap[inv.id] || 0)
-                                                            });
-                                                            if (res.success) {
-                                                                toast.success("Invoice Re-Opened!");
-                                                                fetchInvoices();
-                                                            } else {
-                                                                toast.error(res.error || "Failed to re-open invoice");
-                                                            }
-                                                            setUpdatingId(null);
-                                                        }}
-                                                        disabled={updatingId === inv.id}
-                                                        className="btn btn-secondary px-3 py-1 text-xs text-amber-600 border-amber-200 bg-amber-50"
-                                                        title="Change back to Pending"
-                                                    >
-                                                        ↻ Re-open
-                                                    </button>
-                                                )}
-                                                <button
-                                                    onClick={() => openDetails(inv)}
-                                                    className="btn btn-primary px-3 py-1 text-xs"
-                                                    title="Edit & Download PDF"
-                                                >
-                                                    ✏️ Edit
-                                                </button>
-                                                <button
-                                                    onClick={() => exportPDF(inv, true)}
-                                                    className="btn btn-secondary px-3 py-1 text-xs"
-                                                    title="Preview PDF in Browser"
-                                                >
-                                                    👁️ Preview
-                                                </button>
-                                                <button
-                                                    onClick={() => exportPDF(inv, false)}
-                                                    className="btn btn-secondary px-3 py-1 text-xs"
-                                                    title="Download PDF"
-                                                >
-                                                    📄
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </>
+                                    );
+                                })()
                             )}
                         </tbody>
                     </table>
