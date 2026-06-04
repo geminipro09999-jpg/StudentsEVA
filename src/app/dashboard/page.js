@@ -36,12 +36,13 @@ export default async function Dashboard() {
     const discontinuedCount = (students || []).filter(s => s.status === 'discontinued').length;
 
     // Attendance Calculations
-    const totalAttendance = (attendance || []).reduce((acc, curr) => acc + (curr.present_days / curr.total_days), 0);
-    const avgAttendance = attendance?.length ? ((totalAttendance / attendance.length) * 100).toFixed(1) : '0.0';
+    const validAttendance = (attendance || []).filter(a => a.total_days > 0);
+    const totalAttendance = validAttendance.reduce((acc, curr) => acc + (curr.present_days / curr.total_days), 0);
+    const avgAttendance = validAttendance.length ? ((totalAttendance / validAttendance.length) * 100).toFixed(1) : '0.0';
 
     // Identify At-Risk Students (< 75% attendance)
     const atRiskStudents = (students || []).filter(s => {
-        const studentAttendance = (attendance || []).filter(a => a.student_id === s.id);
+        const studentAttendance = validAttendance.filter(a => a.student_id === s.id);
         if (!studentAttendance.length) return false;
         const studentAvg = studentAttendance.reduce((acc, curr) => acc + (curr.present_days / curr.total_days), 0) / studentAttendance.length;
         return (studentAvg * 100) < 75;
