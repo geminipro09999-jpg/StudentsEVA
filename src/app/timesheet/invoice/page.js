@@ -14,8 +14,9 @@ export default async function InvoicePage() {
 
     const isAdmin = session.user.roles?.includes('admin') || session.user.role === 'admin';
     const isStaff = session.user.roles?.includes('incubator_staff');
+    const isLabAssistant = session.user.roles?.some(r => r && r.startsWith('lab_assistant'));
 
-    if (!isAdmin && !isStaff) {
+    if (!isAdmin && !isStaff && !isLabAssistant) {
         redirect("/dashboard");
     }
 

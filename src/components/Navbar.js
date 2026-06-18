@@ -18,7 +18,8 @@ export default function Navbar() {
 
     const roles = session.user.roles || [session.user.role];
     const isAdminAccount = roles.some(r => ['admin', 'administrator'].includes(r));
-    const isPureStaff = roles.includes('incubator_staff') && roles.length === 1 && !isAdminAccount;
+    const hasInvoiceAccess = roles.some(r => ['incubator_staff', 'lab_assistant_fixed', 'lab_assistant_hourly'].includes(r));
+    const isPureStaff = hasInvoiceAccess && roles.length === 1 && !isAdminAccount;
 
     return (
         <>
@@ -55,10 +56,10 @@ export default function Navbar() {
                             <Link href="/vivas" className={`nav-link ${pathname.includes('/vivas') || pathname.includes('/viva-scoring') ? 'active' : ''}`}>Vivas</Link>
                         </>
                     )}
-                    {roles.includes('incubator_staff') && (
+                    {hasInvoiceAccess && (
                         <>
                             <Link href="/timesheet/invoice" className={`nav-link ${pathname.includes('invoice') ? 'active' : ''}`}>Invoices</Link>
-                            <Link href="/profile" className={`nav-link ${pathname === '/profile' ? 'active' : ''}`}>Profile</Link>
+                            {roles.length === 1 && <Link href="/profile" className={`nav-link ${pathname === '/profile' ? 'active' : ''}`}>Profile</Link>}
                         </>
                     )}
                 </div>
@@ -174,7 +175,7 @@ export default function Navbar() {
                                         <span>Vivas</span>
                                     </Link>
                                 )}
-                                {roles.includes('incubator_staff') && (
+                                {hasInvoiceAccess && (
                                     <Link href="/timesheet/invoice" className={`bottom-nav-item ${pathname.includes('invoice') ? 'active' : ''}`}>
                                         <span className="icon">🧾</span>
                                         <span>Invoice</span>
