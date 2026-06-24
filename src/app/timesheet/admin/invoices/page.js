@@ -386,7 +386,8 @@ export default function AdminInvoicesPage() {
                 totalUnits: totalUnits,
                 activeRate: rate,
                 calculatedGross,
-                displayInvoiceNo: invoiceNosMap[selectedInvoice.id]
+                displayInvoiceNo: invoiceNosMap[selectedInvoice.id],
+                displayDate: datesMap[selectedInvoice.id]
             };
 
             const res = await updateInvoiceData(selectedInvoice.id, updatedData);
@@ -931,20 +932,30 @@ export default function AdminInvoicesPage() {
                         <div className="mt-8 flex justify-end gap-4 pt-6 border-t border-card-border">
                             <button onClick={closeDetails} className="btn btn-secondary">Close Window</button>
                             {selectedInvoice.status === 'pending' && (
-                                <button
-                                    onClick={async () => {
-                                        const saved = await handleSaveCorrections();
-                                        if (saved !== false) {
-                                            handleApprove(selectedInvoice.id);
-                                            closeDetails();
-                                        }
-                                    }}
-                                    className="btn btn-primary"
-                                    style={{ background: '#10b981' }}
-                                    disabled={isSavingCorrections || updatingId === selectedInvoice.id}
-                                >
-                                    {isSavingCorrections ? "Saving..." : "Approve & Close"}
-                                </button>
+                                <>
+                                    <button
+                                        onClick={handleSaveCorrections}
+                                        className="btn btn-secondary"
+                                        style={{ borderColor: '#6366f1', color: '#818cf8' }}
+                                        disabled={isSavingCorrections || updatingId === selectedInvoice.id}
+                                    >
+                                        {isSavingCorrections ? "Saving..." : "💾 Save Changes"}
+                                    </button>
+                                    <button
+                                        onClick={async () => {
+                                            const saved = await handleSaveCorrections();
+                                            if (saved !== false) {
+                                                handleApprove(selectedInvoice.id);
+                                                closeDetails();
+                                            }
+                                        }}
+                                        className="btn btn-primary"
+                                        style={{ background: '#10b981' }}
+                                        disabled={isSavingCorrections || updatingId === selectedInvoice.id}
+                                    >
+                                        {isSavingCorrections ? "Saving..." : "Approve & Close"}
+                                    </button>
+                                </>
                             )}
                         </div>
                     </div>

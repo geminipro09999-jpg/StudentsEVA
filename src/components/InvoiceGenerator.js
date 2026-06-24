@@ -523,6 +523,7 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
                             value={selectedLecturer}
                             onChange={e => {
                                 setSelectedLecturer(e.target.value);
+                                setInvoiceDescription('');
                             }}
                             style={{ width: '100%' }}
                             disabled={!initialIsAdmin}
@@ -533,13 +534,19 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
                     </div>
                     <div>
                         <label>Month</label>
-                        <select value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} style={{ width: '100%' }}>
+                        <select value={selectedMonth} onChange={e => {
+                            setSelectedMonth(e.target.value);
+                            setInvoiceDescription('');
+                        }} style={{ width: '100%' }}>
                             {MONTH_NAMES.slice(1).map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
                         </select>
                     </div>
                     <div>
                         <label>Year</label>
-                        <select value={selectedYear} onChange={e => setSelectedYear(e.target.value)} style={{ width: '100%' }}>
+                        <select value={selectedYear} onChange={e => {
+                            setSelectedYear(e.target.value);
+                            setInvoiceDescription('');
+                        }} style={{ width: '100%' }}>
                             {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
                         </select>
                     </div>
