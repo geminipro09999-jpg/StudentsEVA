@@ -52,12 +52,18 @@ export const authOptions = {
         })
     ],
     callbacks: {
-        async jwt({ token, user }) {
+        async jwt({ token, user, trigger, session }) {
             if (user) {
                 token.roles = user.roles;
                 token.id = user.id;
                 token.address = user.address;
                 token.phone = user.phone;
+            }
+            // Handle session update from client
+            if (trigger === "update" && session) {
+                if (session.address !== undefined) token.address = session.address;
+                if (session.phone !== undefined) token.phone = session.phone;
+                if (session.staff_email !== undefined) token.staff_email = session.staff_email;
             }
             return token;
         },
@@ -67,6 +73,7 @@ export const authOptions = {
                 session.user.id = token.id;
                 session.user.address = token.address;
                 session.user.phone = token.phone;
+                session.user.staff_email = token.staff_email;
 
                 // Robust role check: prioritize 'admin' or 'administrator'
                 const roles = session.user.roles;

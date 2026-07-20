@@ -6,9 +6,10 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import bcrypt from "bcryptjs";
 
 export async function updateProfile(userId, data) {
+    console.log("==> updateProfile called with userId:", userId, "data:", data);
     if (!userId) return { error: "User ID is required" };
 
-    const { error } = await supabase
+    const { data: updateData, error } = await supabase
         .from('users')
         .update({
             address: data.address,
@@ -20,7 +21,10 @@ export async function updateProfile(userId, data) {
             branch: data.branch,
             e_signature: data.e_signature
         })
-        .eq('id', userId);
+        .eq('id', userId)
+        .select();
+
+    console.log("==> updateProfile result:", { error, updateData });
 
     if (error) return { error: error.message };
 
