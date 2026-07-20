@@ -2,6 +2,7 @@
 
 :root,
 [data-theme='dark'] {
+  color-scheme: dark;
   /* Indigo Nexus - Deep Indigo Atmosphere */
   --bg-color: #0b1326;
   --bg-gradient: radial-gradient(circle at 50% -20%, #1e2a4a 0%, #0b1326 70%);
@@ -60,6 +61,7 @@
 }
 
 [data-theme='light'] {
+  color-scheme: light;
   /* Porcelain Indigo - Crisp, Clean, and Premium */
   --bg-color: #f6f8ff;
   --bg-gradient: radial-gradient(circle at 50% 0%, #ffffff 0%, #eef1ff 100%);
