@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import toast from "react-hot-toast";
-import { submitInvoice } from "@/app/actions/invoiceActions";
+import { submitInvoice, reopenInvoice } from "@/app/actions/invoiceActions";
 
 const MONTH_NAMES = [
     '', 'January', 'February', 'March', 'April', 'May', 'June',
@@ -216,6 +216,31 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
             toast.error(res.error || "Failed to submit invoice");
         }
         setSubmissionLoading(false);
+    };
+
+    const handleReopenInvoice = async () => {
+        if (!existingInvoice) return;
+        if (!confirm("Are you sure you want to reopen this approved invoice? It will be changed back to Pending status so it can be edited and resubmitted.")) {
+            return;
+        }
+        setSubmissionLoading(true);
+        try {
+            const res = await reopenInvoice(existingInvoice.id, {
+                amount: calculatedGross
+            });
+            if (res.success) {
+                toast.success("Invoice reopened to Pending! You can now edit and update it.");
+                existingInvoice.status = 'pending';
+                setIsSubmitted(false);
+                window.location.reload();
+            } else {
+                toast.error(res.error || "Failed to reopen invoice");
+            }
+        } catch (err) {
+            toast.error(err.message || "Failed to reopen invoice");
+        } finally {
+            setSubmissionLoading(false);
+        }
     };
 
     async function exportPDF() {
@@ -696,9 +721,21 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
                                 </div>
                             </div>
                             {existingInvoice.status === 'approved' && (
-                                <div className="text-right border-l border-emerald-200 pl-6">
-                                    <p className="text-[10px] uppercase font-bold opacity-60 tracking-wider">Authorized Final Total</p>
-                                    <p className="text-2xl font-black tracking-tight">LKR {existingInvoice.amount?.toLocaleString()}</p>
+                                <div className="text-right border-l border-emerald-200 pl-6 flex flex-col items-end gap-2">
+                                    <div>
+                                        <p className="text-[10px] uppercase font-bold opacity-60 tracking-wider">Authorized Final Total</p>
+                                        <p className="text-2xl font-black tracking-tight">LKR {existingInvoice.amount?.toLocaleString()}</p>
+                                    </div>
+                                    {initialIsAdmin && (
+                                        <button
+                                            onClick={handleReopenInvoice}
+                                            disabled={submissionLoading}
+                                            className="btn btn-secondary px-3 py-1 text-xs border-amber-300 bg-amber-100 text-amber-800 hover:bg-amber-200"
+                                            title="Reopen invoice back to Pending status so it can be edited"
+                                        >
+                                            {submissionLoading ? "Reopening..." : "🔄 Reopen Invoice"}
+                                        </button>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -811,6 +848,15 @@ export default function InvoiceGenerator({ entries, lecturers, invoices = [], cu
                                 {existingInvoice?.status === 'approved' && (
                                     <button onClick={exportWord} className="btn btn-secondary bg-blue-50 text-blue-700 border-blue-200">
                                         📝 Download Word Document
+                                    </button>
+                                )}
+                                {existingInvoice?.status === 'approved' && initialIsAdmin && (
+                                    <button
+                                        onClick={handleReopenInvoice}
+                                        disabled={submissionLoading}
+                                        className="btn btn-secondary border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100"
+                                    >
+                                        {submissionLoading ? "Reopening..." : "🔄 Reopen to Edit"}
                                     </button>
                                 )}
                             </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { approveInvoice, updateInvoiceData } from "@/app/actions/invoiceActions";
+import { approveInvoice, updateInvoiceData, reopenInvoice, updateInvoiceAmount } from "@/app/actions/invoiceActions";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
@@ -142,6 +142,64 @@ export default function AdminInvoicesPage() {
             fetchInvoices();
         } else {
             toast.error(res.error || "Failed to reject invoice");
+        }
+        setUpdatingId(null);
+    };
+
+    const handleReopen = async (invoiceId) => {
+        if (!confirm("Are you sure you want to reopen this invoice? Its status will be changed back to PENDING, allowing full editing and resubmission.")) {
+            return;
+        }
+        setUpdatingId(invoiceId);
+
+        // Also persist invoice number if changed
+        const inv = invoices.find(i => i.id === invoiceId);
+        if (inv && invoiceNosMap[invoiceId] !== inv.invoice_data?.displayInvoiceNo) {
+            const updatedData = {
+                ...inv.invoice_data,
+                displayInvoiceNo: invoiceNosMap[invoiceId]
+            };
+            await updateInvoiceData(invoiceId, updatedData);
+        }
+
+        const res = await reopenInvoice(invoiceId, {
+            amount: Number(baseAmtMap[invoiceId] || 0),
+            deductions: Number(deductionsMap[invoiceId] || 0)
+        });
+
+        if (res.success) {
+            toast.success("Invoice reopened to Pending! Amount saved.");
+            fetchInvoices();
+        } else {
+            toast.error(res.error || "Failed to reopen invoice");
+        }
+        setUpdatingId(null);
+    };
+
+    const handleSaveAmount = async (invoiceId) => {
+        setUpdatingId(invoiceId);
+
+        // Also persist invoice number if changed
+        const inv = invoices.find(i => i.id === invoiceId);
+        if (inv && invoiceNosMap[invoiceId] !== inv.invoice_data?.displayInvoiceNo) {
+            const updatedData = {
+                ...inv.invoice_data,
+                displayInvoiceNo: invoiceNosMap[invoiceId]
+            };
+            await updateInvoiceData(invoiceId, updatedData);
+        }
+
+        const res = await updateInvoiceAmount(
+            invoiceId,
+            Number(baseAmtMap[invoiceId] || 0),
+            Number(deductionsMap[invoiceId] || 0)
+        );
+
+        if (res.success) {
+            toast.success("Amount and deductions updated!");
+            fetchInvoices();
+        } else {
+            toast.error(res.error || "Failed to update amount");
         }
         setUpdatingId(null);
     };
@@ -583,7 +641,7 @@ export default function AdminInvoicesPage() {
                                                             type="text"
                                                             value={invoiceNosMap[inv.id] || ''}
                                                             onChange={(e) => setInvoiceNosMap({...invoiceNosMap, [inv.id]: e.target.value})}
-                                                            disabled={inv.status !== 'pending' || updatingId === inv.id}
+                                                            disabled={updatingId === inv.id}
                                                             className="table-input font-mono text-xs"
                                                             style={{ width: '80px', padding: '0.2rem 0.5rem' }}
                                                         />
@@ -593,7 +651,7 @@ export default function AdminInvoicesPage() {
                                                             type="number"
                                                             value={baseAmtMap[inv.id] || 0}
                                                             onChange={(e) => handleBaseAmtChange(inv.id, e.target.value)}
-                                                            disabled={inv.status !== 'pending' || updatingId === inv.id}
+                                                            disabled={updatingId === inv.id}
                                                             className="table-input"
                                                             style={{ width: '120px', padding: '0.2rem 0.5rem', fontSize: '0.9rem', fontWeight: 'bold' }}
                                                         />
@@ -603,7 +661,7 @@ export default function AdminInvoicesPage() {
                                                             type="number"
                                                             value={deductionsMap[inv.id] || 0}
                                                             onChange={(e) => handleDeductionChange(inv.id, e.target.value)}
-                                                            disabled={inv.status !== 'pending' || updatingId === inv.id}
+                                                            disabled={updatingId === inv.id}
                                                             className="table-input"
                                                             style={{ width: '100px', padding: '0.2rem 0.5rem', fontSize: '0.9rem' }}
                                                         />
@@ -625,7 +683,7 @@ export default function AdminInvoicesPage() {
                                                         </span>
                                                     </td>
                                                     <td>
-                                                        <div className="flex gap-2">
+                                                        <div className="flex gap-2 items-center flex-wrap">
                                                             {inv.status === 'pending' && (
                                                                 <>
                                                                     <button
@@ -644,6 +702,30 @@ export default function AdminInvoicesPage() {
                                                                     >
                                                                         Reject
                                                                     </button>
+                                                                </>
+                                                            )}
+                                                            {(inv.status === 'approved' || inv.status === 'rejected') && (
+                                                                <>
+                                                                    <button
+                                                                        onClick={() => handleReopen(inv.id)}
+                                                                        disabled={updatingId === inv.id}
+                                                                        className="btn px-2.5 py-1 text-xs font-semibold rounded"
+                                                                        style={{ background: '#fef3c7', color: '#b45309', border: '1px solid #fde68a' }}
+                                                                        title="Reopen invoice back to Pending status (with edited amount)"
+                                                                    >
+                                                                        {updatingId === inv.id ? "..." : "🔄 Reopen"}
+                                                                    </button>
+                                                                    {(Number(baseAmtMap[inv.id]) !== Number(inv.amount) || Number(deductionsMap[inv.id]) !== Number(inv.deductions)) && (
+                                                                        <button
+                                                                            onClick={() => handleSaveAmount(inv.id)}
+                                                                            disabled={updatingId === inv.id}
+                                                                            className="btn btn-primary px-2.5 py-1 text-xs rounded"
+                                                                            style={{ background: '#6366f1' }}
+                                                                            title="Save updated amount"
+                                                                        >
+                                                                            💾 Save
+                                                                        </button>
+                                                                    )}
                                                                 </>
                                                             )}
                                                             <button
@@ -792,8 +874,7 @@ export default function AdminInvoicesPage() {
                             <>
                                 <div className="flex justify-between items-center mb-4">
                                     <h4 className="text-sm font-bold uppercase tracking-wider mb-0 text-primary">Timesheet Editor</h4>
-                                    {selectedInvoice.status === 'pending' && (
-                                        <button
+                                    {(<button
                                             onClick={handleSaveCorrections}
                                             disabled={isSavingCorrections}
                                             className="btn btn-secondary px-3 py-1 text-xs flex items-center gap-2"
@@ -820,7 +901,7 @@ export default function AdminInvoicesPage() {
                                                             type="date"
                                                             value={item.work_date ? new Date(item.work_date).toISOString().split('T')[0] : ''}
                                                             onChange={e => handleItemChange(idx, 'work_date', e.target.value)}
-                                                            disabled={selectedInvoice.status !== 'pending'}
+                                                            disabled={false}
                                                             className="bg-transparent border border-card-border rounded px-2 py-1 text-xs w-32 focus:border-primary disabled:opacity-50"
                                                         />
                                                     </td>
@@ -829,7 +910,7 @@ export default function AdminInvoicesPage() {
                                                             type="time"
                                                             value={item.in_time || ''}
                                                             onChange={e => handleItemChange(idx, 'in_time', e.target.value)}
-                                                            disabled={selectedInvoice.status !== 'pending'}
+                                                            disabled={false}
                                                             className="bg-transparent border border-card-border rounded px-2 py-1 text-xs w-24 focus:border-primary disabled:opacity-50"
                                                         />
                                                         <span className="text-secondary">-</span>
@@ -837,7 +918,7 @@ export default function AdminInvoicesPage() {
                                                             type="time"
                                                             value={item.out_time || ''}
                                                             onChange={e => handleItemChange(idx, 'out_time', e.target.value)}
-                                                            disabled={selectedInvoice.status !== 'pending'}
+                                                            disabled={false}
                                                             className="bg-transparent border border-card-border rounded px-2 py-1 text-xs w-24 focus:border-primary disabled:opacity-50"
                                                         />
                                                     </td>
@@ -847,13 +928,12 @@ export default function AdminInvoicesPage() {
                                                             step="0.1"
                                                             value={item.hours || 0}
                                                             onChange={e => handleItemChange(idx, 'hours', e.target.value)}
-                                                            disabled={selectedInvoice.status !== 'pending'}
+                                                            disabled={false}
                                                             className="bg-transparent border border-card-border rounded px-2 py-1 text-xs w-16 text-center font-bold focus:border-primary mx-auto block disabled:opacity-50 text-accent"
                                                         />
                                                     </td>
                                                     <td className="p-3 text-center">
-                                                        {selectedInvoice.status === 'pending' && (
-                                                            <button
+                                                        {(<button
                                                                 onClick={() => handleRemoveItem(idx)}
                                                                 className="text-danger/50 hover:text-danger p-1 rounded hover:bg-danger/10 transition-colors opacity-0 group-hover:opacity-100"
                                                                 title="Remove Entry"
@@ -879,8 +959,7 @@ export default function AdminInvoicesPage() {
                         <>
                             <div className="flex justify-between items-center mb-4 mt-6">
                                 <h4 className="text-sm font-bold uppercase tracking-wider mb-0 text-primary">Additional Payments</h4>
-                                {selectedInvoice.status === 'pending' && (
-                                    <button
+                                {(<button
                                         onClick={handleAddExtraPayment}
                                         className="btn btn-secondary px-3 py-1 text-xs flex items-center gap-2"
                                     >
@@ -898,7 +977,7 @@ export default function AdminInvoicesPage() {
                                                     type="text"
                                                     value={payment.description}
                                                     onChange={e => handleExtraPaymentChange(idx, 'description', e.target.value)}
-                                                    disabled={selectedInvoice.status !== 'pending'}
+                                                    disabled={false}
                                                     className="w-full bg-transparent border border-card-border rounded px-2 py-1 text-sm focus:border-primary disabled:opacity-50"
                                                 />
                                             </div>
@@ -908,12 +987,11 @@ export default function AdminInvoicesPage() {
                                                     type="number"
                                                     value={payment.amount}
                                                     onChange={e => handleExtraPaymentChange(idx, 'amount', Number(e.target.value))}
-                                                    disabled={selectedInvoice.status !== 'pending'}
+                                                    disabled={false}
                                                     className="w-full bg-transparent border border-card-border rounded px-2 py-1 text-sm focus:border-primary disabled:opacity-50"
                                                 />
                                             </div>
-                                            {selectedInvoice.status === 'pending' && (
-                                                <button
+                                            {(<button
                                                     onClick={() => handleRemoveExtraPayment(idx)}
                                                     className="btn bg-red-50 text-red-600 border-red-200 px-3 py-1.5 mb-0.5"
                                                     title="Remove"
@@ -931,31 +1009,45 @@ export default function AdminInvoicesPage() {
 
                         <div className="mt-8 flex justify-end gap-4 pt-6 border-t border-card-border">
                             <button onClick={closeDetails} className="btn btn-secondary">Close Window</button>
+                            <button
+                                onClick={handleSaveCorrections}
+                                className="btn btn-secondary"
+                                style={{ borderColor: '#6366f1', color: '#818cf8' }}
+                                disabled={isSavingCorrections || updatingId === selectedInvoice.id}
+                            >
+                                {isSavingCorrections ? "Saving..." : "💾 Save Changes"}
+                            </button>
+                            {selectedInvoice.status === 'approved' && (
+                                <button
+                                    onClick={async () => {
+                                        const saved = await handleSaveCorrections();
+                                        if (saved !== false) {
+                                            await handleReopen(selectedInvoice.id);
+                                            closeDetails();
+                                        }
+                                    }}
+                                    className="btn font-semibold"
+                                    style={{ background: '#fef3c7', color: '#b45309', border: '1px solid #fde68a' }}
+                                    disabled={isSavingCorrections || updatingId === selectedInvoice.id}
+                                >
+                                    🔄 Reopen to Pending
+                                </button>
+                            )}
                             {selectedInvoice.status === 'pending' && (
-                                <>
-                                    <button
-                                        onClick={handleSaveCorrections}
-                                        className="btn btn-secondary"
-                                        style={{ borderColor: '#6366f1', color: '#818cf8' }}
-                                        disabled={isSavingCorrections || updatingId === selectedInvoice.id}
-                                    >
-                                        {isSavingCorrections ? "Saving..." : "💾 Save Changes"}
-                                    </button>
-                                    <button
-                                        onClick={async () => {
-                                            const saved = await handleSaveCorrections();
-                                            if (saved !== false) {
-                                                handleApprove(selectedInvoice.id);
-                                                closeDetails();
-                                            }
-                                        }}
-                                        className="btn btn-primary"
-                                        style={{ background: '#10b981' }}
-                                        disabled={isSavingCorrections || updatingId === selectedInvoice.id}
-                                    >
-                                        {isSavingCorrections ? "Saving..." : "Approve & Close"}
-                                    </button>
-                                </>
+                                <button
+                                    onClick={async () => {
+                                        const saved = await handleSaveCorrections();
+                                        if (saved !== false) {
+                                            handleApprove(selectedInvoice.id);
+                                            closeDetails();
+                                        }
+                                    }}
+                                    className="btn btn-primary"
+                                    style={{ background: '#10b981' }}
+                                    disabled={isSavingCorrections || updatingId === selectedInvoice.id}
+                                >
+                                    {isSavingCorrections ? "Saving..." : "Approve & Close"}
+                                </button>
                             )}
                         </div>
                     </div>

@@ -26,10 +26,14 @@ export async function submitInvoice(invoiceData) {
 
         let error;
         if (existing) {
-            if (existing.status === 'approved') {
+            const roles = session?.user?.roles || [];
+            const isAdmin = roles.some(r => ['admin', 'administrator'].includes(r)) ||
+                ['admin', 'administrator'].includes(session?.user?.role);
+
+            if (existing.status === 'approved' && !isAdmin) {
                 throw new Error("This invoice is already approved and cannot be overwritten. Contact an admin if you need it reopened.");
             }
-            // Update existing invoice (pending or rejected back to pending)
+            // Update existing invoice (pending or rejected back to pending, or admin updating approved)
             ({ error } = await supabase
                 .from('invoices')
                 .update({
@@ -94,6 +98,79 @@ export async function approveInvoice(invoiceId, update) {
         return { success: true };
     } catch (error) {
         console.error("approveInvoice error:", error);
+        return { error: error.message };
+    }
+}
+
+/**
+ * Admin reopens an approved or rejected invoice back to pending,
+ * and updates amount/deductions at the same time if provided.
+ */
+export async function reopenInvoice(invoiceId, update = {}) {
+    try {
+        const session = await getServerSession(authOptions);
+        const roles = session?.user?.roles || [];
+        const isAdmin = roles.some(r => ['admin', 'administrator'].includes(r)) ||
+            ['admin', 'administrator'].includes(session?.user?.role);
+
+        if (!session || !isAdmin) throw new Error("Unauthorized: Admin only");
+
+        const updatePayload = {
+            status: 'pending',
+            updated_at: new Date().toISOString()
+        };
+
+        if (update.amount !== undefined && update.amount !== null && !isNaN(Number(update.amount))) {
+            updatePayload.amount = Number(update.amount);
+        }
+        if (update.deductions !== undefined && update.deductions !== null && !isNaN(Number(update.deductions))) {
+            updatePayload.deductions = Number(update.deductions);
+        }
+
+        const { error } = await supabase
+            .from('invoices')
+            .update(updatePayload)
+            .eq('id', invoiceId);
+
+        if (error) throw error;
+
+        revalidatePath("/timesheet/admin/invoices");
+        revalidatePath("/timesheet/invoice");
+        return { success: true };
+    } catch (error) {
+        console.error("reopenInvoice error:", error);
+        return { error: error.message };
+    }
+}
+
+/**
+ * Admin updates the base amount and deductions of an invoice directly
+ */
+export async function updateInvoiceAmount(invoiceId, amount, deductions = 0) {
+    try {
+        const session = await getServerSession(authOptions);
+        const roles = session?.user?.roles || [];
+        const isAdmin = roles.some(r => ['admin', 'administrator'].includes(r)) ||
+            ['admin', 'administrator'].includes(session?.user?.role);
+
+        if (!session || !isAdmin) throw new Error("Unauthorized: Admin only");
+
+        const { error } = await supabase
+            .from('invoices')
+            .update({
+                amount: Number(amount) || 0,
+                deductions: Number(deductions) || 0,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', invoiceId);
+
+        if (error) throw error;
+
+        revalidatePath("/timesheet/admin/invoices");
+        revalidatePath("/timesheet/invoice");
+        return { success: true };
+    } catch (error) {
+        console.error("updateInvoiceAmount error:", error);
         return { error: error.message };
     }
 }
